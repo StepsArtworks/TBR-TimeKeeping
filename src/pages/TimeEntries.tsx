@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TimeEntryForm } from '../components/time-entries/TimeEntryForm';
 import { TimeEntriesList } from '../components/time-entries/TimeEntriesList';
 import { TimeEntriesFilter } from '../components/time-entries/TimeEntriesFilter';
 import { TimeEntriesSummary } from '../components/time-entries/TimeEntriesSummary';
 import { useTimeEntries } from '../hooks/useTimeEntries';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/db';
 import { Project, TimeEntry } from '../types';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 export function TimeEntries() {
   const {
@@ -15,31 +16,32 @@ export function TimeEntries() {
     filter,
     setFilter,
     deleteEntry,
-    refresh,
   } = useTimeEntries();
-  const [projects, setProjects] = useState<Project[]>([]);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        const { data } = await supabase
-          .from('projects')
-          .select('*')
-          .order('name');
-        setProjects(data || []);
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-      }
-    }
-
-    fetchProjects();
-  }, []);
+  // Use live query for projects
+  const projects = useLiveQuery(
+    () => db.projects.orderBy('name').toArray(),
+    []
+  );
 
   const handleEdit = (entry: TimeEntry) => {
     setEditingEntry(entry);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (!projects) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -56,7 +58,6 @@ export function TimeEntries() {
         </h2>
         <TimeEntryForm
           onSubmit={() => {
-            refresh();
             setEditingEntry(null);
           }}
           entry={editingEntry}

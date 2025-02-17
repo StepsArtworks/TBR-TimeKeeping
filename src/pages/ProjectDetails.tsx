@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Calendar,
   Clock,
@@ -8,9 +8,9 @@ import {
   LayoutGrid,
   List,
   Users,
+  AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { supabase } from '../lib/supabase';
 import { Project, Task, User } from '../types';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import { TaskList } from '../components/projects/TaskList';
@@ -19,11 +19,13 @@ import { TeamManagement } from '../components/projects/TeamManagement';
 import { ProjectAnalytics } from '../components/projects/ProjectAnalytics';
 import { useProjectAnalytics } from '../hooks/useProjectAnalytics';
 import { formatCurrency } from '../lib/utils';
+import { db } from '../lib/db';
 
 export function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
   const [team, setTeam] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,62 +35,80 @@ export function ProjectDetails() {
   const analytics = useProjectAnalytics(id!);
 
   useEffect(() => {
-    async function fetchProjectDetails() {
+    async function loadProjectDetails() {
+      if (!id) {
+        setError('Project ID is missing');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch project details
-        const { data: projectData, error: projectError } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('id', id)
-          .single();
+        // Load project from IndexedDB
+        const project = await db.projects.get(id);
+        if (!project) {
+          throw new Error('Project not found');
+        }
+        setProject(project);
 
-        if (projectError) throw projectError;
-        setProject(projectData);
+        // Load project tasks
+        const tasks = await db.tasks
+          .where('project_id')
+          .equals(id)
+          .toArray();
+        setProjectTasks(tasks);
 
-        // Fetch project tasks
-        const { data: taskData, error: taskError } = await supabase
-          .from('tasks')
-          .select(`
-            *,
-            assigned_to:users(id, full_name)
-          `)
-          .eq('project_id', id)
-          .order('created_at', { ascending: false });
+        // Get unique assigned user IDs
+        const assignedUserIds = new Set(tasks.map(t => t.assigned_to).filter(Boolean));
 
-        if (taskError) throw taskError;
-        setTasks(taskData || []);
+        // Load team members
+        const teamMembers = await db.users
+          .where('id')
+          .anyOf([...assignedUserIds])
+          .toArray();
+        setTeam(teamMembers);
 
-        // Fetch team members
-        const { data: teamData, error: teamError } = await supabase
-          .from('users')
-          .select('*')
-          .in(
-            'id',
-            taskData?.map((task) => task.assigned_to?.id) || []
-          );
-
-        if (teamError) throw teamError;
-        setTeam(teamData || []);
       } catch (err) {
-        setError('Failed to load project details');
         console.error('Error loading project details:', err);
+        setError('Failed to load project details. The project may have been deleted.');
+        // Redirect to projects page after a delay if project not found
+        setTimeout(() => navigate('/projects'), 3000);
       } finally {
         setLoading(false);
       }
     }
 
-    if (id) {
-      fetchProjectDetails();
+    loadProjectDetails();
+  }, [id, navigate]);
+
+  const handleTaskUpdate = async (taskId: string, newStatus: Task['status']) => {
+    try {
+      await db.tasks.update(taskId, {
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      });
+      
+      // Update local state
+      setProjectTasks(tasks => 
+        tasks.map(task => 
+          task.id === taskId 
+            ? { ...task, status: newStatus }
+            : task
+        )
+      );
+    } catch (err) {
+      console.error('Error updating task:', err);
     }
-  }, [id]);
+  };
 
   const handleAssignTeamMember = async (userId: string) => {
     try {
-      // Implementation for assigning team member
-      console.log('Assigning team member:', userId);
+      const user = await db.users.get(userId);
+      if (user && !team.find(t => t.id === userId)) {
+        setTeam([...team, user]);
+      }
     } catch (err) {
       console.error('Error assigning team member:', err);
     }
@@ -96,8 +116,25 @@ export function ProjectDetails() {
 
   const handleRemoveTeamMember = async (userId: string) => {
     try {
-      // Implementation for removing team member
-      console.log('Removing team member:', userId);
+      setTeam(team.filter(t => t.id !== userId));
+      
+      // Update tasks assigned to this user
+      const userTasks = projectTasks.filter(t => t.assigned_to === userId);
+      for (const task of userTasks) {
+        await db.tasks.update(task.id, {
+          assigned_to: null,
+          updated_at: new Date().toISOString()
+        });
+      }
+      
+      // Update local state
+      setProjectTasks(tasks =>
+        tasks.map(task =>
+          task.assigned_to === userId
+            ? { ...task, assigned_to: null }
+            : task
+        )
+      );
     } catch (err) {
       console.error('Error removing team member:', err);
     }
@@ -119,9 +156,17 @@ export function ProjectDetails() {
   if (error || !project) {
     return (
       <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
-        <p className="text-sm text-red-700 dark:text-red-300">
-          {error || 'Project not found'}
-        </p>
+        <div className="flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-400" />
+          <div>
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">
+              {error || 'Project not found'}
+            </p>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+              Redirecting to projects page...
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -239,9 +284,9 @@ export function ProjectDetails() {
       </div>
 
       {viewMode === 'board' ? (
-        <KanbanBoard tasks={tasks} onTaskUpdate={() => {}} />
+        <KanbanBoard tasks={projectTasks} onTaskUpdate={handleTaskUpdate} />
       ) : (
-        <TaskList tasks={tasks} onTaskUpdate={() => {}} />
+        <TaskList tasks={projectTasks} onTaskUpdate={handleTaskUpdate} />
       )}
 
       <TeamManagement

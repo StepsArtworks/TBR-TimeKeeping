@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, Briefcase, FileText, Link2 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { Project, Task } from '../../types';
+import { Clock, Calendar, Briefcase, FileText, Link2, User as UserIcon } from 'lucide-react';
+import { Project, Task, User } from '../../types';
 import { TaskDependencies } from './TaskDependencies';
 import { useTaskDependencies } from '../../hooks/useTaskDependencies';
 import { cn } from '../../lib/utils';
+import { db } from '../../lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface TaskFormProps {
   projectId: string;
@@ -23,15 +24,22 @@ export function TaskForm({
 }: TaskFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
-  const [formData, setFormData] = useState({
-    name: task?.name || '',
-    description: task?.description || '',
-    status: task?.status || 'not_started',
-    dueDate: task?.due_date?.split('T')[0] || '',
-    estimatedHours: task?.estimated_hours?.toString() || '',
-    assignedTo: task?.assigned_to || '',
-  });
+
+  // Use live query for team members
+  const teamMembers = useLiveQuery(
+    () => db.users.where('role').notEqual('management').toArray(),
+    []
+  );
+
+  // Use live query for available tasks
+  const availableTasks = useLiveQuery(
+    () => db.tasks
+      .where('project_id')
+      .equals(projectId)
+      .filter(t => t.id !== task?.id)
+      .toArray(),
+    [projectId, task?.id]
+  );
 
   const {
     dependencies,
@@ -41,26 +49,27 @@ export function TaskForm({
     removeDependency,
   } = useTaskDependencies(task?.id || '');
 
+  const [formData, setFormData] = useState({
+    name: task?.name || '',
+    description: task?.description || '',
+    status: task?.status || 'not_started',
+    dueDate: task?.due_date?.split('T')[0] || '',
+    estimatedHours: task?.estimated_hours?.toString() || '',
+    assignedTo: task?.assigned_to || '',
+  });
+
   useEffect(() => {
-    async function fetchAvailableTasks() {
-      try {
-        const { data, error } = await supabase
-          .from('tasks')
-          .select('id, name')
-          .eq('project_id', projectId)
-          .neq('id', task?.id);
-
-        if (error) throw error;
-        setAvailableTasks(data || []);
-      } catch (err) {
-        console.error('Error fetching available tasks:', err);
-      }
+    if (task) {
+      setFormData({
+        name: task.name,
+        description: task.description,
+        status: task.status,
+        dueDate: task.due_date?.split('T')[0] || '',
+        estimatedHours: task.estimated_hours?.toString() || '',
+        assignedTo: task.assigned_to || '',
+      });
     }
-
-    if (projectId) {
-      fetchAvailableTasks();
-    }
-  }, [projectId, task?.id]);
+  }, [task]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,29 +77,27 @@ export function TaskForm({
     setError(null);
 
     try {
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) throw new Error('Not authenticated');
-
       const taskData = {
+        id: task?.id || crypto.randomUUID(),
         project_id: projectId,
         name: formData.name,
         description: formData.description,
-        status: formData.status,
-        due_date: formData.dueDate || null,
-        estimated_hours: formData.estimatedHours
-          ? parseFloat(formData.estimatedHours)
-          : null,
+        status: formData.status as Task['status'],
+        start_date: task?.start_date || new Date().toISOString(),
+        due_date: formData.dueDate,
+        estimated_hours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : 0,
+        actual_hours: task?.actual_hours || 0,
         assigned_to: formData.assignedTo || null,
+        created_at: task?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
-      const { error: saveError } = task
-        ? await supabase
-            .from('tasks')
-            .update(taskData)
-            .eq('id', task.id)
-        : await supabase.from('tasks').insert([taskData]);
+      if (task) {
+        await db.tasks.update(task.id, taskData);
+      } else {
+        await db.tasks.add(taskData);
+      }
 
-      if (saveError) throw saveError;
       onSubmit();
     } catch (err) {
       setError('Failed to save task');
@@ -99,6 +106,19 @@ export function TaskForm({
       setLoading(false);
     }
   };
+
+  if (!teamMembers || !availableTasks) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className={cn('space-y-6', className)}>
@@ -165,6 +185,33 @@ export function TaskForm({
             <option value="completed">Completed</option>
             <option value="blocked">Blocked</option>
           </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="assignedTo"
+            className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Assigned To
+          </label>
+          <div className="relative">
+            <UserIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <select
+              id="assignedTo"
+              value={formData.assignedTo}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, assignedTo: e.target.value }))
+              }
+              className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
+            >
+              <option value="">Unassigned</option>
+              {teamMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.full_name} ({member.department})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div>

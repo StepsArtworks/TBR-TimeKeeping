@@ -11,6 +11,10 @@ interface StatCardProps {
     value: number;
     isPositive: boolean;
   };
+  progress?: {
+    current: number;
+    target: number;
+  };
   className?: string;
 }
 
@@ -20,6 +24,7 @@ export function StatCard({
   icon: Icon,
   description,
   trend,
+  progress,
   className,
 }: StatCardProps) {
   return (
@@ -50,6 +55,27 @@ export function StatCard({
           <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
             vs last period
           </span>
+        </div>
+      )}
+      {progress && (
+        <div className="mt-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600 dark:text-gray-400">Progress</span>
+            <span className="font-medium">
+              {Math.round((progress.current / progress.target) * 100)}%
+            </span>
+          </div>
+          <div className="mt-2 h-2 rounded-full bg-gray-200 dark:bg-dark-700">
+            <div
+              className={cn(
+                "h-2 rounded-full",
+                progress.current >= progress.target ? "bg-green-500" : "bg-primary-500"
+              )}
+              style={{
+                width: `${Math.min((progress.current / progress.target) * 100, 100)}%`,
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
