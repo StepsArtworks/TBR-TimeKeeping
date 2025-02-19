@@ -15,14 +15,3 @@
     @apply text-gray-900 antialiased dark:text-gray-100;
   }
 }
-
-@layer utilities {
-  .scrollbar-hidden::-webkit-scrollbar {
-    display: none;
-  }
-  
-  .scrollbar-hidden {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-}

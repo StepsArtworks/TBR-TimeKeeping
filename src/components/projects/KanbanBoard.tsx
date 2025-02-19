@@ -16,6 +16,7 @@ import {
 import { Task } from '../../types';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanTask } from './KanbanTask';
+import { useAuth } from '../../components/AuthProvider';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -24,6 +25,11 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = React.useState<Task | null>(null);
+  const { user } = useAuth();
+  
+  // Check if user has edit permissions (lead or management)
+  const canEdit = user?.role === 'lead' || user?.role === 'management';
+
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -49,11 +55,17 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
     tasks.filter((task) => task.status === status);
 
   const handleDragStart = (event: DragStartEvent) => {
+    // Only allow drag if user has edit permissions
+    if (!canEdit) return;
+    
     const task = tasks.find((t) => t.id === event.active.id);
     if (task) setActiveTask(task);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    // Only allow drop if user has edit permissions
+    if (!canEdit) return;
+    
     const { active, over } = event;
     if (!over) return;
 
@@ -80,13 +92,14 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
             title={column.title}
             status={column.status}
             tasks={getTasksByStatus(column.status)}
+            canEdit={canEdit}
           />
         ))}
       </div>
       <DragOverlay>
         {activeTask && (
-          <div className="cursor-grabbing">
-            <KanbanTask task={activeTask} />
+          <div className={`cursor-${canEdit ? 'grabbing' : 'not-allowed'}`}>
+            <KanbanTask task={activeTask} canEdit={canEdit} />
           </div>
         )}
       </DragOverlay>

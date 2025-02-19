@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState } from 'react';
 import { format, subDays } from 'date-fns';
+import { db } from '../lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface ProjectMetrics {
   total_hours: number;
@@ -22,76 +23,74 @@ interface TaskData {
 }
 
 export function useProjectAnalytics(projectId: string) {
-  const [metrics, setMetrics] = useState<ProjectMetrics>({
-    total_hours: 0,
-    billable_hours: 0,
-    completion_percentage: 0,
-    task_completion_rate: 0,
-  });
-  const [timeData, setTimeData] = useState<TimeData[]>([]);
-  const [taskData, setTaskData] = useState<TaskData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchAnalytics() {
+  // Use live query for project data
+  const data = useLiveQuery(
+    async () => {
+      if (!projectId) return null;
+
       try {
-        setLoading(true);
-        setError(null);
+        // Get project tasks
+        const projectTasks = await db.tasks
+          .where('project_id')
+          .equals(projectId)
+          .toArray();
 
-        // Fetch project metrics
-        const { data: metricsData, error: metricsError } = await supabase
-          .from('project_metrics')
-          .select('*')
-          .eq('project_id', projectId)
-          .single();
+        // Get project time entries
+        const projectTimeEntries = await db.timeEntries
+          .where('project_id')
+          .equals(projectId)
+          .toArray();
 
-        if (metricsError) throw metricsError;
+        // Calculate metrics
+        const totalHours = projectTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+        const billableHours = projectTimeEntries
+          .filter(entry => entry.is_billable)
+          .reduce((sum, entry) => sum + entry.hours, 0);
 
-        // Fetch time entries for the last 14 days
-        const startDate = format(subDays(new Date(), 13), 'yyyy-MM-dd');
-        const { data: timeEntries, error: timeError } = await supabase
-          .from('time_entries')
-          .select('date, hours, is_billable')
-          .eq('project_id', projectId)
-          .gte('date', startDate)
-          .order('date');
+        const completedTasks = projectTasks.filter(task => task.status === 'completed').length;
+        const completionPercentage = (completedTasks / (projectTasks.length || 1)) * 100;
 
-        if (timeError) throw timeError;
+        // Calculate task completion rate (tasks completed per day)
+        const oldestTask = projectTasks.reduce((oldest, task) => {
+          const taskDate = new Date(task.created_at);
+          return taskDate < oldest ? taskDate : oldest;
+        }, new Date());
 
-        // Process time data
+        const daysSinceStart = Math.max(
+          1,
+          Math.ceil((new Date().getTime() - oldestTask.getTime()) / (1000 * 60 * 60 * 24))
+        );
+        const taskCompletionRate = completedTasks / daysSinceStart;
+
+        // Calculate time distribution for last 14 days
         const timeByDate = new Map<string, { total: number; billable: number }>();
         for (let i = 13; i >= 0; i--) {
           const date = format(subDays(new Date(), i), 'MMM d');
           timeByDate.set(date, { total: 0, billable: 0 });
         }
 
-        timeEntries?.forEach((entry) => {
+        projectTimeEntries.forEach(entry => {
           const date = format(new Date(entry.date), 'MMM d');
-          const current = timeByDate.get(date) || { total: 0, billable: 0 };
-          timeByDate.set(date, {
-            total: current.total + entry.hours,
-            billable: current.billable + (entry.is_billable ? entry.hours : 0),
-          });
+          if (timeByDate.has(date)) {
+            const current = timeByDate.get(date)!;
+            timeByDate.set(date, {
+              total: current.total + entry.hours,
+              billable: current.billable + (entry.is_billable ? entry.hours : 0),
+            });
+          }
         });
 
-        // Fetch task status changes
-        const { data: taskData, error: taskError } = await supabase
-          .from('tasks')
-          .select('status, created_at, updated_at')
-          .eq('project_id', projectId)
-          .order('created_at');
-
-        if (taskError) throw taskError;
-
-        // Process task data
+        // Calculate task data
         const tasksByDate = new Map<string, { completed: number; inProgress: number }>();
         for (let i = 13; i >= 0; i--) {
           const date = format(subDays(new Date(), i), 'MMM d');
           tasksByDate.set(date, { completed: 0, inProgress: 0 });
         }
 
-        taskData?.forEach((task) => {
+        projectTasks.forEach(task => {
           const date = format(new Date(task.updated_at), 'MMM d');
           if (tasksByDate.has(date)) {
             const current = tasksByDate.get(date)!;
@@ -104,39 +103,45 @@ export function useProjectAnalytics(projectId: string) {
           }
         });
 
-        setMetrics(metricsData);
-        setTimeData(
-          Array.from(timeByDate.entries()).map(([date, hours]) => ({
+        return {
+          metrics: {
+            total_hours: totalHours,
+            billable_hours: billableHours,
+            completion_percentage: completionPercentage,
+            task_completion_rate: taskCompletionRate,
+          },
+          timeData: Array.from(timeByDate.entries()).map(([date, hours]) => ({
             date,
             hours: hours.total,
             billableHours: hours.billable,
-          }))
-        );
-        setTaskData(
-          Array.from(tasksByDate.entries()).map(([date, counts]) => ({
+          })),
+          taskData: Array.from(tasksByDate.entries()).map(([date, counts]) => ({
             date,
             completed: counts.completed,
             inProgress: counts.inProgress,
-          }))
-        );
+          })),
+        };
       } catch (err) {
-        setError('Failed to load project analytics');
         console.error('Error loading project analytics:', err);
+        setError('Failed to load project analytics');
+        return null;
       } finally {
         setLoading(false);
       }
-    }
-
-    if (projectId) {
-      fetchAnalytics();
-    }
-  }, [projectId]);
+    },
+    [projectId]
+  );
 
   return {
-    metrics,
-    timeData,
-    taskData,
-    loading,
+    metrics: data?.metrics || {
+      total_hours: 0,
+      billable_hours: 0,
+      completion_percentage: 0,
+      task_completion_rate: 0,
+    },
+    timeData: data?.timeData || [],
+    taskData: data?.taskData || [],
+    loading: loading && !data,
     error,
   };
 }

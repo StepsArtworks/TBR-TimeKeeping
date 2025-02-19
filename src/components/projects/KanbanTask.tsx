@@ -2,12 +2,17 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task } from '../../types';
+import { Clock, AlertCircle } from 'lucide-react';
+import { formatDate } from '../../lib/utils';
+import { db } from '../../lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface KanbanTaskProps {
   task: Task;
+  canEdit: boolean;
 }
 
-export function KanbanTask({ task }: KanbanTaskProps) {
+export function KanbanTask({ task, canEdit }: KanbanTaskProps) {
   const {
     attributes,
     listeners,
@@ -17,6 +22,7 @@ export function KanbanTask({ task }: KanbanTaskProps) {
     isDragging,
   } = useSortable({
     id: task.id,
+    disabled: !canEdit,
   });
 
   const style = {
@@ -24,27 +30,53 @@ export function KanbanTask({ task }: KanbanTaskProps) {
     transition,
   };
 
+  // Use live query to get assigned user
+  const assignedUser = useLiveQuery(
+    () => db.users.get(task.assigned_to),
+    [task.assigned_to]
+  );
+
+  const isOverdue = task.due_date && new Date(task.due_date) < new Date();
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-dark-700 dark:bg-dark-800 ${
+      {...(canEdit ? { ...attributes, ...listeners } : {})}
+      className={`${
+        canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+      } rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-dark-700 dark:bg-dark-800 ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
-      <h4 className="font-medium">{task.name}</h4>
-      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h4 className="font-medium">{task.name}</h4>
+        {isOverdue && (
+          <div className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
+            <AlertCircle className="h-3 w-3" />
+            <span>Overdue</span>
+          </div>
+        )}
+      </div>
+      
+      <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
         {task.description}
       </p>
-      {task.assigned_to && (
+
+      {task.due_date && (
+        <div className="mb-2 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <Clock className="h-4 w-4" />
+          <span>Due {formatDate(task.due_date)}</span>
+        </div>
+      )}
+
+      {assignedUser && (
         <div className="mt-3 flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium dark:bg-dark-700">
-            {(task.assigned_to as any).full_name[0]}
+            {assignedUser.full_name[0]}
           </div>
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {(task.assigned_to as any).full_name}
+            {assignedUser.full_name}
           </span>
         </div>
       )}
