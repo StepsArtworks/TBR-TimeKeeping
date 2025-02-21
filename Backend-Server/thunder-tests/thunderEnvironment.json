@@ -1,0 +1,16 @@
+[
+  {
+    "_id": "68a075d8-ff15-4743-b545-7b21bf15ead1",
+    "name": "dev",
+    "default": true,
+    "sortNum": 10000,
+    "created": "2022-11-17T03:45:33.962Z",
+    "modified": "2022-11-17T03:46:12.724Z",
+    "data": [
+      {
+        "name": "url",
+        "value": "http://127.0.0.1:7777"
+      }
+    ]
+  }
+]

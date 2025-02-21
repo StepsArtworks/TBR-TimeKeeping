@@ -1,0 +1,61 @@
+[
+  {
+    "_id": "775ed7c3-b39c-4c4e-9256-d575facd5626",
+    "colId": "5122a959-52e6-485b-90b5-e03c1627782a",
+    "containerId": "2b5bcb78-d07d-4e56-ac43-94e6af1674dd",
+    "name": "Get all",
+    "url": "{{url}}/config",
+    "method": "GET",
+    "sortNum": 30000,
+    "created": "2022-11-17T03:45:02.535Z",
+    "modified": "2022-11-18T14:23:19.775Z",
+    "headers": [],
+    "params": [],
+    "tests": []
+  },
+  {
+    "_id": "1ea2431e-afa0-485e-80d1-ac946dbd0688",
+    "colId": "5122a959-52e6-485b-90b5-e03c1627782a",
+    "containerId": "2b5bcb78-d07d-4e56-ac43-94e6af1674dd",
+    "name": "Get all with paging",
+    "url": "{{url}}/config?page=1",
+    "method": "GET",
+    "sortNum": 40000,
+    "created": "2022-11-17T03:45:02.536Z",
+    "modified": "2022-11-18T14:23:34.354Z",
+    "headers": [],
+    "params": [
+      {
+        "name": "page",
+        "value": "1",
+        "isPath": false
+      }
+    ],
+    "tests": []
+  },
+  {
+    "_id": "a0867794-4990-4645-a165-d60a084aca1f",
+    "colId": "5122a959-52e6-485b-90b5-e03c1627782a",
+    "containerId": "2b5bcb78-d07d-4e56-ac43-94e6af1674dd",
+    "name": "Get all with paging and page count",
+    "url": "{{url}}/config?page=2&perpage=2",
+    "method": "GET",
+    "sortNum": 50000,
+    "created": "2022-11-17T03:45:02.537Z",
+    "modified": "2022-11-18T14:23:41.946Z",
+    "headers": [],
+    "params": [
+      {
+        "name": "page",
+        "value": "2",
+        "isPath": false
+      },
+      {
+        "name": "perpage",
+        "value": "2",
+        "isPath": false
+      }
+    ],
+    "tests": []
+  }
+]

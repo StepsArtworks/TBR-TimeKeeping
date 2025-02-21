@@ -1,0 +1,17 @@
+[
+  {
+    "_id": "5122a959-52e6-485b-90b5-e03c1627782a",
+    "colName": "Tests",
+    "created": "2022-11-18T14:24:09.223Z",
+    "sortNum": 30000,
+    "folders": [
+      {
+        "_id": "2b5bcb78-d07d-4e56-ac43-94e6af1674dd",
+        "name": "config",
+        "containerId": "",
+        "created": "2022-11-17T03:45:02.530Z",
+        "sortNum": 10000
+      }
+    ]
+  }
+]
