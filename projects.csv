@@ -1,0 +1,4 @@
+id,name,description,start_date,end_date,budget,budget_spent,status,created_by,created_at,updated_at
+a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d,Website Redesign,Complete overhaul of company website,2024-01-01,2024-03-31,50000,15000,in_progress,d7bed21c-5699-4715-89b9-dd1d7654c937,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
+b2c3d4e5-f6a7-5b6c-9d0e-1f2a3b4c5d6e,Mobile App Development,New mobile app for customers,2024-01-15,2024-04-15,75000,20000,in_progress,d7bed21c-5699-4715-89b9-dd1d7654c937,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
+c3d4e5f6-a7b8-6c7d-0e1f-2a3b4c5d6e7f,Internal Dashboard,Analytics dashboard for internal use,2024-01-01,2024-02-28,30000,25000,in_progress,d7bed21c-5699-4715-89b9-dd1d7654c937,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z

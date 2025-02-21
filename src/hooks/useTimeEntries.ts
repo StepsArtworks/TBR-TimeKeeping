@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState } from 'react';
 import { TimeEntry } from '../types';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { useAuth } from '../components/AuthProvider';
+import { db } from '../lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface TimeEntriesFilter {
   startDate: string;
@@ -10,74 +12,71 @@ interface TimeEntriesFilter {
 }
 
 export function useTimeEntries() {
-  const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const [filter, setFilter] = useState<TimeEntriesFilter>({
     startDate: startOfMonth(new Date()).toISOString().split('T')[0],
     endDate: endOfMonth(new Date()).toISOString().split('T')[0],
   });
 
-  const fetchEntries = async () => {
-    try {
-      setLoading(true);
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) throw new Error('Not authenticated');
+  // Use live query for time entries with filtering
+  const entries = useLiveQuery(
+    async () => {
+      if (!user) return [];
 
-      let query = supabase
-        .from('time_entries')
-        .select(`
-          *,
-          project:projects(name),
-          task:tasks(name)
-        `)
-        .eq('user_id', user.id)
-        .gte('date', filter.startDate)
-        .lte('date', filter.endDate)
-        .order('date', { ascending: false });
+      try {
+        let query = db.timeEntries
+          .where('user_id')
+          .equals(user.id)
+          .filter(entry => 
+            entry.date >= filter.startDate && 
+            entry.date <= filter.endDate
+          );
 
-      if (filter.projectId) {
-        query = query.eq('project_id', filter.projectId);
+        if (filter.projectId) {
+          query = query.filter(entry => entry.project_id === filter.projectId);
+        }
+
+        const entries = await query.toArray();
+
+        // Get projects and tasks for the entries
+        const projectIds = new Set(entries.map(e => e.project_id));
+        const taskIds = new Set(entries.map(e => e.task_id).filter(Boolean));
+
+        const [projects, tasks] = await Promise.all([
+          db.projects.where('id').anyOf([...projectIds]).toArray(),
+          db.tasks.where('id').anyOf([...taskIds]).toArray()
+        ]);
+
+        // Enrich entries with project and task data
+        return entries.map(entry => ({
+          ...entry,
+          project: projects.find(p => p.id === entry.project_id),
+          task: tasks.find(t => t.id === entry.task_id)
+        })).sort((a, b) => b.date.localeCompare(a.date));
+
+      } catch (err) {
+        console.error('Error loading time entries:', err);
+        return [];
       }
-
-      const { data, error: fetchError } = await query;
-
-      if (fetchError) throw fetchError;
-      setEntries(data || []);
-    } catch (err) {
-      setError('Failed to load time entries');
-      console.error('Error loading time entries:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchEntries();
-  }, [filter]);
+    },
+    [filter, user]
+  );
 
   const deleteEntry = async (id: string) => {
     try {
-      const { error: deleteError } = await supabase
-        .from('time_entries')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) throw deleteError;
-      await fetchEntries();
+      await db.timeEntries.delete(id);
     } catch (err) {
-      setError('Failed to delete time entry');
       console.error('Error deleting time entry:', err);
+      throw err;
     }
   };
 
   return {
-    entries,
-    loading,
-    error,
+    entries: entries || [],
+    loading: !entries,
+    error: null,
     filter,
     setFilter,
     deleteEntry,
-    refresh: fetchEntries,
   };
 }

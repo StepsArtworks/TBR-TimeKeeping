@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, Briefcase, FileText, DollarSign } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { Clock, Calendar, FileText, DollarSign } from 'lucide-react';
+import { db } from '../../lib/db';
 import { Project, Task, TimeEntry } from '../../types';
 import { cn } from '../../lib/utils';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useAuth } from '../../components/AuthProvider'; // Fixed import path
 
 interface TimeEntryFormProps {
   onSubmit: () => void;
@@ -11,126 +13,172 @@ interface TimeEntryFormProps {
 }
 
 export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    projectId: '',
     taskId: '',
-    hours: '',
+    startTime: '08:00', // Updated default start time
+    endTime: '17:00', // Updated default end time
     description: '',
     isBillable: true,
   });
 
+  // Get tasks assigned to the user
+  const tasks = useLiveQuery(async () => {
+    if (!user) return [];
+
+    try {
+      let query = db.tasks
+        .where('assigned_to')
+        .equals(user.id)
+        .filter(task => task.status !== 'completed');
+
+      const tasks = await query.toArray();
+
+      // Get the projects for these tasks
+      const projectIds = [...new Set(tasks.map(task => task.project_id))];
+      const projects = await db.projects
+        .where('id')
+        .anyOf(projectIds)
+        .toArray();
+
+      // Combine task and project data
+      return tasks.map(task => ({
+        ...task,
+        project: projects.find(p => p.id === task.project_id)
+      }));
+    } catch (err) {
+      console.error('Error loading tasks:', err);
+      return [];
+    }
+  }, [user]);
+
+  // Get selected task's project
+  const selectedTask = tasks?.find(t => t.id === formData.taskId);
+
   useEffect(() => {
     if (entry) {
+      // Convert hours to time range (assuming 8 AM start by default)
+      const startTime = '08:00';
+      const [hours, minutes] = entry.hours.toString().split('.');
+      const endHours = parseInt(hours) + 8;
+      const endMinutes = minutes ? Math.round(parseFloat(`0.${minutes}`) * 60) : 0;
+      const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+
       setFormData({
         date: entry.date,
-        projectId: entry.project_id,
         taskId: entry.task_id || '',
-        hours: entry.hours.toString(),
+        startTime,
+        endTime,
         description: entry.description,
         isBillable: entry.is_billable,
       });
     }
   }, [entry]);
 
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('status', 'in_progress')
-          .order('name');
-
-        if (error) throw error;
-        setProjects(data || []);
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-      }
+  const calculateHours = (startTime: string, endTime: string): number => {
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    let diffMinutes = endMinutes - startMinutes;
+    
+    // Subtract lunch hour if work spans across lunch time
+    if (startHour < 12 && endHour > 13) {
+      diffMinutes -= 60; // Subtract 1 hour for lunch
     }
-
-    fetchProjects();
-  }, []);
-
-  useEffect(() => {
-    async function fetchTasks() {
-      if (!formData.projectId) {
-        setTasks([]);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('project_id', formData.projectId)
-          .neq('status', 'completed')
-          .order('name');
-
-        if (error) throw error;
-        setTasks(data || []);
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
-      }
-    }
-
-    fetchTasks();
-  }, [formData.projectId]);
+    
+    return Math.round((diffMinutes / 60) * 100) / 100; // Round to 2 decimal places
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user || !selectedTask) return;
+
+    // Validate time range
+    const hours = calculateHours(formData.startTime, formData.endTime);
+    if (hours <= 0) {
+      setError('End time must be after start time');
+      return;
+    }
+
+    if (hours > 8) {
+      setError('Maximum working hours per day is 8 hours');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) throw new Error('Not authenticated');
-
       const timeEntry = {
+        id: entry?.id || crypto.randomUUID(),
         user_id: user.id,
-        project_id: formData.projectId,
-        task_id: formData.taskId || null,
+        project_id: selectedTask.project_id,
+        task_id: formData.taskId,
         date: formData.date,
-        hours: parseFloat(formData.hours),
+        hours,
         description: formData.description,
         is_billable: formData.isBillable,
+        created_at: entry?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
-      const { error: saveError } = entry
-        ? await supabase
-            .from('time_entries')
-            .update(timeEntry)
-            .eq('id', entry.id)
-        : await supabase.from('time_entries').insert([timeEntry]);
+      await db.transaction('rw', [db.timeEntries, db.tasks], async () => {
+        if (entry) {
+          await db.timeEntries.update(entry.id, timeEntry);
+        } else {
+          await db.timeEntries.add(timeEntry);
 
-      if (saveError) throw saveError;
+          // Update task status if it's not started
+          const task = await db.tasks.get(formData.taskId);
+          if (task && task.status === 'not_started') {
+            await db.tasks.update(formData.taskId, {
+              status: 'in_progress',
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      });
 
       setFormData({
         date: new Date().toISOString().split('T')[0],
-        projectId: '',
         taskId: '',
-        hours: '',
+        startTime: '08:00',
+        endTime: '17:00',
         description: '',
         isBillable: true,
       });
 
       onSubmit();
-    } catch (error) {
+    } catch (err) {
+      console.error('Error saving time entry:', err);
       setError('Failed to save time entry. Please try again.');
-      console.error('Error saving time entry:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  if (!tasks) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className={cn('space-y-6', className)}>
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <div>
           <label
             htmlFor="date"
@@ -155,83 +203,70 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
 
         <div>
           <label
-            htmlFor="hours"
+            htmlFor="startTime"
             className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Hours
+            Start Time
           </label>
           <div className="relative">
             <Clock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
-              type="number"
-              id="hours"
+              type="time"
+              id="startTime"
               required
-              min="0.1"
-              step="0.1"
-              value={formData.hours}
+              value={formData.startTime}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, hours: e.target.value }))
+                setFormData((prev) => ({ ...prev, startTime: e.target.value }))
               }
               className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
-              placeholder="Enter hours"
             />
           </div>
         </div>
 
         <div>
           <label
-            htmlFor="project"
+            htmlFor="endTime"
             className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Project
+            End Time
           </label>
           <div className="relative">
-            <Briefcase className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-            <select
-              id="project"
+            <Clock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input
+              type="time"
+              id="endTime"
               required
-              value={formData.projectId}
+              value={formData.endTime}
               onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  projectId: e.target.value,
-                  taskId: '',
-                }))
+                setFormData((prev) => ({ ...prev, endTime: e.target.value }))
               }
               className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
-            >
-              <option value="">Select a project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
-        <div>
+        <div className="md:col-span-3">
           <label
             htmlFor="task"
             className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Task (Optional)
+            Task
           </label>
           <div className="relative">
             <FileText className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <select
               id="task"
+              required
               value={formData.taskId}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, taskId: e.target.value }))
               }
               className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
-              disabled={!formData.projectId}
             >
               <option value="">Select a task</option>
               {tasks.map((task) => (
                 <option key={task.id} value={task.id}>
-                  {task.name}
+                  {task.project?.name} - {task.name}
                 </option>
               ))}
             </select>
@@ -259,7 +294,7 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
         />
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center justify-between">
         <div className="flex items-center">
           <input
             type="checkbox"
@@ -278,6 +313,15 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
             Billable
           </label>
         </div>
+
+        {formData.startTime && formData.endTime && (
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Total Hours: {calculateHours(formData.startTime, formData.endTime)}
+            {formData.startTime < '12:00' && formData.endTime > '13:00' && (
+              <span className="ml-2 text-xs text-gray-500">(Lunch break deducted)</span>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -293,9 +337,9 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
             onClick={() => {
               setFormData({
                 date: new Date().toISOString().split('T')[0],
-                projectId: '',
                 taskId: '',
-                hours: '',
+                startTime: '08:00',
+                endTime: '17:00',
                 description: '',
                 isBillable: true,
               });

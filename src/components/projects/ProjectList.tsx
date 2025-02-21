@@ -6,19 +6,33 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
-  Loader2,
   Users,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import { Project } from '../../types';
 import { formatCurrency } from '../../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface ProjectListProps {
   projects: Project[];
   loading: boolean;
   error: string | null;
+  canEdit: boolean;
+  onEdit: (project: Project) => void;
+  onDelete: (projectId: string) => void;
 }
 
-export function ProjectList({ projects, loading, error }: ProjectListProps) {
+export function ProjectList({ 
+  projects, 
+  loading, 
+  error,
+  canEdit,
+  onEdit,
+  onDelete,
+}: ProjectListProps) {
+  const navigate = useNavigate();
+
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'not_started':
@@ -38,7 +52,7 @@ export function ProjectList({ projects, loading, error }: ProjectListProps) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-500" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Loading projects...
           </p>
@@ -80,30 +94,55 @@ export function ProjectList({ projects, loading, error }: ProjectListProps) {
   }
 
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {projects.map((project) => (
         <div
           key={project.id}
           className="group relative overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md dark:bg-dark-800"
         >
-          <div className="absolute right-4 top-4">
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${getStatusColor(
-                  project.status
-                )}`}
-              />
-              <span className="text-sm capitalize text-gray-600 dark:text-gray-400">
-                {project.status.replace('_', ' ')}
-              </span>
+          {canEdit && (
+            <div className="absolute right-2 top-2 flex gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(project);
+                }}
+                className="rounded-lg bg-gray-100 p-2 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(project.id);
+                }}
+                className="rounded-lg bg-gray-100 p-2 text-red-600 hover:bg-red-100 dark:bg-dark-700 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-          </div>
+          )}
 
-          <div className="p-6">
-            <h3 className="mb-2 text-lg font-medium">{project.name}</h3>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              {project.description}
-            </p>
+          <div 
+            className="p-6 cursor-pointer"
+            onClick={() => navigate(`/projects/${project.id}`)}
+          >
+            <div className="mb-4">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${getStatusColor(
+                    project.status
+                  )}`}
+                />
+                <span className="text-sm capitalize text-gray-600 dark:text-gray-400">
+                  {project.status.replace('_', ' ')}
+                </span>
+              </div>
+              <h3 className="mt-2 text-lg font-medium">{project.name}</h3>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                {project.description}
+              </p>
+            </div>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -162,7 +201,13 @@ export function ProjectList({ projects, loading, error }: ProjectListProps) {
                   </div>
                 ))}
               </div>
-              <button className="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium text-gray-900 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-100 dark:hover:bg-dark-600">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/projects/${project.id}`);
+                }}
+                className="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium text-gray-900 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-100 dark:hover:bg-dark-600"
+              >
                 View Details
               </button>
             </div>

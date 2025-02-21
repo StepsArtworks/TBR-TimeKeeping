@@ -8,9 +8,10 @@ interface KanbanColumnProps {
   title: string;
   status: Task['status'];
   tasks: Task[];
+  canEdit: boolean;
 }
 
-export function KanbanColumn({ title, status, tasks }: KanbanColumnProps) {
+export function KanbanColumn({ title, status, tasks, canEdit }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: status,
   });
@@ -18,18 +19,25 @@ export function KanbanColumn({ title, status, tasks }: KanbanColumnProps) {
   return (
     <div
       ref={setNodeRef}
-      className="flex h-full flex-col rounded-lg bg-white p-4 shadow-sm dark:bg-dark-800"
+      className={`flex h-full flex-col rounded-lg bg-white p-4 shadow-sm dark:bg-dark-800 ${
+        canEdit ? 'cursor-pointer' : ''
+      }`}
     >
-      <h3 className="mb-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-        {title} ({tasks.length})
-      </h3>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {title}
+        </h3>
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-xs font-medium dark:bg-dark-700">
+          {tasks.length}
+        </span>
+      </div>
       <div className="flex-1 space-y-3">
         <SortableContext
           items={tasks.map((task) => task.id)}
           strategy={verticalListSortingStrategy}
         >
           {tasks.map((task) => (
-            <KanbanTask key={task.id} task={task} />
+            <KanbanTask key={task.id} task={task} canEdit={canEdit} />
           ))}
         </SortableContext>
       </div>

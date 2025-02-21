@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Calendar, DollarSign, Users, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { Calendar, DollarSign, X } from 'lucide-react';
 import { Project } from '../../types';
-import { cn } from '../../lib/utils';
+import { useAuth } from '../AuthProvider';
+import { db } from '../../lib/db';
 
 interface ProjectFormProps {
   project?: Project;
@@ -17,6 +17,7 @@ export function ProjectForm({
   onCancel,
   className,
 }: ProjectFormProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -34,27 +35,35 @@ export function ProjectForm({
     setError(null);
 
     try {
-      const user = (await supabase.auth.getUser()).data.user;
       if (!user) throw new Error('Not authenticated');
 
-      const projectData = {
+      // Validate user permissions
+      if (user.role !== 'management' && user.role !== 'lead') {
+        throw new Error('Insufficient permissions');
+      }
+
+      const projectData: Project = {
+        id: project?.id || crypto.randomUUID(),
         name: formData.name,
         description: formData.description,
         start_date: formData.startDate,
         end_date: formData.endDate || null,
-        budget: formData.budget ? parseFloat(formData.budget) : null,
-        status: formData.status,
-        created_by: project ? undefined : user.id,
+        budget: formData.budget ? parseFloat(formData.budget) : 0,
+        budget_spent: project?.budget_spent || 0,
+        status: formData.status as Project['status'],
+        created_by: project?.created_by || user.id,
+        created_at: project?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
-      const { error: saveError } = project
-        ? await supabase
-            .from('projects')
-            .update(projectData)
-            .eq('id', project.id)
-        : await supabase.from('projects').insert([projectData]);
+      if (project) {
+        // Update existing project
+        await db.projects.update(project.id, projectData);
+      } else {
+        // Add new project
+        await db.projects.add(projectData);
+      }
 
-      if (saveError) throw saveError;
       onSubmit();
     } catch (err) {
       setError('Failed to save project');
@@ -65,7 +74,7 @@ export function ProjectForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={cn('space-y-6', className)}>
+    <form onSubmit={handleSubmit} className={className}>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">
           {project ? 'Edit Project' : 'New Project'}
@@ -79,7 +88,7 @@ export function ProjectForm({
         </button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div className="md:col-span-2">
           <label
             htmlFor="name"
@@ -214,12 +223,12 @@ export function ProjectForm({
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+        <div className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
           {error}
         </div>
       )}
 
-      <div className="flex justify-end space-x-3">
+      <div className="mt-6 flex justify-end space-x-3">
         <button
           type="button"
           onClick={onCancel}

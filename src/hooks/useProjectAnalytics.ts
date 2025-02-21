@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
+import { tasks, timeEntries } from '../lib/mockData';
 
 interface ProjectMetrics {
   total_hours: number;
@@ -34,101 +34,94 @@ export function useProjectAnalytics(projectId: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchAnalytics() {
-      try {
-        setLoading(true);
-        setError(null);
+    if (!projectId) return;
 
-        // Fetch project metrics
-        const { data: metricsData, error: metricsError } = await supabase
-          .from('project_metrics')
-          .select('*')
-          .eq('project_id', projectId)
-          .single();
+    try {
+      setLoading(true);
+      setError(null);
 
-        if (metricsError) throw metricsError;
+      // Calculate project metrics
+      const projectTimeEntries = timeEntries.filter(entry => entry.project_id === projectId);
+      const projectTasks = tasks.filter(task => task.project_id === projectId);
 
-        // Fetch time entries for the last 14 days
-        const startDate = format(subDays(new Date(), 13), 'yyyy-MM-dd');
-        const { data: timeEntries, error: timeError } = await supabase
-          .from('time_entries')
-          .select('date, hours, is_billable')
-          .eq('project_id', projectId)
-          .gte('date', startDate)
-          .order('date');
+      const totalHours = projectTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+      const billableHours = projectTimeEntries
+        .filter(entry => entry.is_billable)
+        .reduce((sum, entry) => sum + entry.hours, 0);
 
-        if (timeError) throw timeError;
+      const completedTasks = projectTasks.filter(task => task.status === 'completed').length;
+      const completionPercentage = (completedTasks / (projectTasks.length || 1)) * 100;
 
-        // Process time data
-        const timeByDate = new Map<string, { total: number; billable: number }>();
-        for (let i = 13; i >= 0; i--) {
-          const date = format(subDays(new Date(), i), 'MMM d');
-          timeByDate.set(date, { total: 0, billable: 0 });
-        }
+      // Calculate task completion rate (tasks completed per day)
+      const taskCompletionRate = completedTasks / 30; // Assuming 30 days
 
-        timeEntries?.forEach((entry) => {
-          const date = format(new Date(entry.date), 'MMM d');
-          const current = timeByDate.get(date) || { total: 0, billable: 0 };
+      // Calculate time distribution for last 14 days
+      const timeByDate = new Map<string, { total: number; billable: number }>();
+      for (let i = 13; i >= 0; i--) {
+        const date = format(subDays(new Date(), i), 'MMM d');
+        timeByDate.set(date, { total: 0, billable: 0 });
+      }
+
+      projectTimeEntries.forEach(entry => {
+        const date = format(new Date(entry.date), 'MMM d');
+        if (timeByDate.has(date)) {
+          const current = timeByDate.get(date)!;
           timeByDate.set(date, {
             total: current.total + entry.hours,
             billable: current.billable + (entry.is_billable ? entry.hours : 0),
           });
-        });
-
-        // Fetch task status changes
-        const { data: taskData, error: taskError } = await supabase
-          .from('tasks')
-          .select('status, created_at, updated_at')
-          .eq('project_id', projectId)
-          .order('created_at');
-
-        if (taskError) throw taskError;
-
-        // Process task data
-        const tasksByDate = new Map<string, { completed: number; inProgress: number }>();
-        for (let i = 13; i >= 0; i--) {
-          const date = format(subDays(new Date(), i), 'MMM d');
-          tasksByDate.set(date, { completed: 0, inProgress: 0 });
         }
+      });
 
-        taskData?.forEach((task) => {
-          const date = format(new Date(task.updated_at), 'MMM d');
-          if (tasksByDate.has(date)) {
-            const current = tasksByDate.get(date)!;
-            if (task.status === 'completed') {
-              current.completed++;
-            } else if (task.status === 'in_progress') {
-              current.inProgress++;
-            }
-            tasksByDate.set(date, current);
-          }
-        });
-
-        setMetrics(metricsData);
-        setTimeData(
-          Array.from(timeByDate.entries()).map(([date, hours]) => ({
-            date,
-            hours: hours.total,
-            billableHours: hours.billable,
-          }))
-        );
-        setTaskData(
-          Array.from(tasksByDate.entries()).map(([date, counts]) => ({
-            date,
-            completed: counts.completed,
-            inProgress: counts.inProgress,
-          }))
-        );
-      } catch (err) {
-        setError('Failed to load project analytics');
-        console.error('Error loading project analytics:', err);
-      } finally {
-        setLoading(false);
+      // Calculate task data
+      const tasksByDate = new Map<string, { completed: number; inProgress: number }>();
+      for (let i = 13; i >= 0; i--) {
+        const date = format(subDays(new Date(), i), 'MMM d');
+        tasksByDate.set(date, { completed: 0, inProgress: 0 });
       }
-    }
 
-    if (projectId) {
-      fetchAnalytics();
+      projectTasks.forEach(task => {
+        const date = format(new Date(task.start_date), 'MMM d');
+        if (tasksByDate.has(date)) {
+          const current = tasksByDate.get(date)!;
+          if (task.status === 'completed') {
+            current.completed++;
+          } else if (task.status === 'in_progress') {
+            current.inProgress++;
+          }
+          tasksByDate.set(date, current);
+        }
+      });
+
+      setMetrics({
+        total_hours: totalHours,
+        billable_hours: billableHours,
+        completion_percentage: completionPercentage,
+        task_completion_rate: taskCompletionRate,
+      });
+
+      setTimeData(
+        Array.from(timeByDate.entries()).map(([date, hours]) => ({
+          date,
+          hours: hours.total,
+          billableHours: hours.billable,
+        }))
+      );
+
+      setTaskData(
+        Array.from(tasksByDate.entries()).map(([date, counts]) => ({
+          date,
+          completed: counts.completed,
+          inProgress: counts.inProgress,
+        }))
+      );
+
+      setError(null);
+    } catch (err) {
+      setError('Failed to load project analytics');
+      console.error('Error loading project analytics:', err);
+    } finally {
+      setLoading(false);
     }
   }, [projectId]);
 

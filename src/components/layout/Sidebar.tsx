@@ -11,24 +11,36 @@ import {
   Home,
   Settings,
   Users,
-  CheckSquare,
+  UserPlus,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../AuthProvider';
 
-const navigation = [
-  { name: 'Dashboard', to: '/', icon: Home },
-  { name: 'Time Entries', to: '/time-entries', icon: Clock },
-  { name: 'Leave Requests', to: '/leave-requests', icon: Calendar },
-  { name: 'Leave Approvals', to: '/leave-approvals', icon: CheckSquare },
-  { name: 'Projects', to: '/projects', icon: FolderOpen },
-  { name: 'Tasks', to: '/tasks', icon: ClipboardList },
-  { name: 'Team', to: '/team', icon: Users },
-  { name: 'Reports', to: '/reports', icon: BarChart3 },
-  { name: 'Settings', to: '/settings', icon: Settings },
-];
+const getNavigation = (role: string) => {
+  // Admin only sees user management
+  if (role === 'admin') {
+    return [
+      { name: 'User Management', to: '/users', icon: UserPlus },
+    ];
+  }
+
+  // Other users see the full navigation
+  return [
+    { name: 'Dashboard', to: '/', icon: Home },
+    { name: 'Time Entries', to: '/time-entries', icon: Clock },
+    { name: 'Leave Management', to: '/leave', icon: Calendar },
+    { name: 'Projects', to: '/projects', icon: FolderOpen },
+    { name: 'Tasks', to: '/tasks', icon: ClipboardList },
+    { name: 'Team', to: '/team', icon: Users },
+    { name: 'Reports', to: '/reports', icon: BarChart3 },
+    { name: 'Settings', to: '/settings', icon: Settings },
+  ];
+};
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
+  const navigation = getNavigation(user?.role || '');
 
   return (
     <aside

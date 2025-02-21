@@ -7,8 +7,11 @@ import {
   isSameMonth,
   isToday,
   isSameDay,
+  addMonths,
+  subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { useAuth } from '../../components/AuthProvider';
 
 interface LeaveCalendarProps {
   requests: any[];
@@ -21,6 +24,8 @@ export function LeaveCalendar({
   currentDate,
   onDateChange,
 }: LeaveCalendarProps) {
+  const { user } = useAuth();
+  const isLead = user?.role === 'lead';
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -28,7 +33,8 @@ export function LeaveCalendar({
   const getRequestsForDay = (date: Date) =>
     requests.filter(
       (request) =>
-        new Date(request.start_date) <= date && new Date(request.end_date) >= date
+        new Date(request.start_date) <= date && 
+        new Date(request.end_date) >= date
     );
 
   const getStatusColor = (status: string) => {
@@ -42,6 +48,17 @@ export function LeaveCalendar({
     }
   };
 
+  const getStatusBgColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-50 dark:bg-green-900/20';
+      case 'rejected':
+        return 'bg-red-50 dark:bg-red-900/20';
+      default:
+        return 'bg-yellow-50 dark:bg-yellow-900/20';
+    }
+  };
+
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm dark:bg-dark-800">
       <div className="mb-4 flex items-center justify-between">
@@ -50,17 +67,13 @@ export function LeaveCalendar({
         </h2>
         <div className="flex items-center gap-2">
           <button
-            onClick={() =>
-              onDateChange(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))
-            }
+            onClick={() => onDateChange(subMonths(currentDate, 1))}
             className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-dark-700"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
-            onClick={() =>
-              onDateChange(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))
-            }
+            onClick={() => onDateChange(addMonths(currentDate, 1))}
             className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-dark-700"
           >
             <ChevronRight className="h-5 w-5" />
@@ -80,11 +93,13 @@ export function LeaveCalendar({
 
         {days.map((day) => {
           const dayRequests = getRequestsForDay(day);
+          const isCurrentMonth = isSameMonth(day, currentDate);
+          
           return (
             <div
               key={day.toISOString()}
               className={`min-h-[100px] rounded-lg border p-2 ${
-                !isSameMonth(day, currentDate)
+                !isCurrentMonth
                   ? 'bg-gray-50 dark:bg-dark-900/50'
                   : 'hover:bg-gray-50 dark:hover:bg-dark-700'
               } ${
@@ -100,7 +115,7 @@ export function LeaveCalendar({
                 {dayRequests.map((request) => (
                   <div
                     key={request.id}
-                    className="rounded bg-gray-100 p-1 text-xs dark:bg-dark-700"
+                    className={`rounded p-1 text-xs ${getStatusBgColor(request.status)}`}
                   >
                     <div className="flex items-center gap-1">
                       <span
@@ -108,16 +123,36 @@ export function LeaveCalendar({
                           request.status
                         )}`}
                       />
-                      <span className="truncate">
+                      <span className="truncate capitalize">
                         {request.leave_type}
                       </span>
                     </div>
+                    {(isLead || request.user_id === user?.id) && (
+                      <div className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+                        {request.user?.full_name}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-4 flex items-center justify-end gap-4">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
+          <span className="text-sm text-gray-600 dark:text-gray-400">Approved</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-full bg-yellow-500" />
+          <span className="text-sm text-gray-600 dark:text-gray-400">Pending</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
+          <span className="text-sm text-gray-600 dark:text-gray-400">Rejected</span>
+        </div>
       </div>
     </div>
   );
