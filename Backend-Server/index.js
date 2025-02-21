@@ -7,20 +7,19 @@ const app = express();
 var port = 7777;
 
 var accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {
-    flags: 'a'
-  })
+  flags: 'a'
+})
 app.use(morgan('combined', {
-    stream: accessLogStream
-  }))
+  stream: accessLogStream
+}))
 
-  app.use(bodyParser.urlencoded({
-    extended: true
-  }))
-  app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({
+  extended: true
+}))
+app.use(bodyParser.json());
 
-require('./routes/config.js')(app);
-const db = require('./services/db');
-db.GenerateTables();
+require('./routes/auth.js')(app);
+require('./routes/projects.js')(app);
 
-console.log(`My Server Name - Listening on Port ${port}`);
+console.log(`TBR Timekeeping - Listening on Port ${port}`);
 app.listen(port);
