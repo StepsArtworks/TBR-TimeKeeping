@@ -41,7 +41,10 @@ export function Login() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Origin': 'https://tbrhub.com'
         },
+        credentials: 'include', // This is important for handling cookies
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
@@ -61,8 +64,11 @@ export function Login() {
       // Store user data
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      // Redirect to dashboard
+      navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
+    } finally {
       setLoading(false);
     }
   };
