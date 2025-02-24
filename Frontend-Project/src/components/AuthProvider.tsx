@@ -31,10 +31,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   }, [navigate]);
+  if (!user) {
+    navigate('/login');
+  }
 
   const logout = () => {
     localStorage.removeItem('user');
     setUser(null);
+    navigate('/login');
   };
 
   return (
