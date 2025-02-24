@@ -17,7 +17,7 @@ module.exports = function (app) {
                 SELECT id, email, password, full_name , role, department 
                 FROM users 
                 WHERE email = ?
-            `, [email]);
+            `, [email])[0];
                 console.log(user);
                 if (!user) {
                     return res.status(401).json({
