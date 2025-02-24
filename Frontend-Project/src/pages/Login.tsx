@@ -57,12 +57,10 @@ export function Login() {
 
       // Store the JWT token
       localStorage.setItem('authToken', data.token);
-      
+
       // Store user data
-      localStorage.setItem('demoUser', JSON.stringify(data.user));
-      
-      // Force a page reload to ensure all auth state is updated
-      window.location.href = '/';
+      localStorage.setItem('user', JSON.stringify(data.user));
+
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
       setLoading(false);

@@ -11,7 +11,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  logout: () => {},
+  logout: () => { },
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -21,24 +21,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check if there's a demo user in localStorage
-    const demoUser = localStorage.getItem('demoUser');
-    if (demoUser) {
-      const userData = JSON.parse(demoUser);
+    const user = localStorage.getItem('user');
+    if (user) {
+      const userData = JSON.parse(user);
       const fullUser = users.find(u => u.id === userData.id);
       setUser(fullUser || null);
     }
     setLoading(false);
 
-    // If no user is found, redirect to login
-    if (!demoUser) {
-      navigate('/login');
-    }
+
   }, [navigate]);
 
   const logout = () => {
-    localStorage.removeItem('demoUser');
+    localStorage.removeItem('user');
     setUser(null);
-    navigate('/login');
   };
 
   return (
