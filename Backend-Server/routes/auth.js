@@ -6,8 +6,8 @@ const requiredparms = require("../middleware/requiredparms.js");
 const JWT_SECRET = 'dinosaur';
 
 module.exports = function (app) {
-    app.route(`/login/`)
-        .post(requiredparms(["email", "password"]), async function (req, res) {
+    app.route(`/login`)
+        .post(async function (req, res) {
             const { email, password } = req.body;
 
             try {
