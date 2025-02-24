@@ -13,11 +13,11 @@ module.exports = function (app) {
             try {
                 // Get user from database
                 const user = db.getall(`
-                SELECT id, email, password, fullname as full_name, role, department 
-                FROM Users 
+                SELECT id, email, password, full_name , role, department 
+                FROM users 
                 WHERE email = ?
             `, [email]);
-
+                console.log(user);
                 if (!user) {
                     return res.status(401).json({
                         status: 401,
