@@ -9,6 +9,7 @@ module.exports = function (app) {
     app.route(`/login`)
         .post(async function (req, res) {
             const { email, password } = req.body;
+            console.log(email, password);
 
             try {
                 // Get user from database
