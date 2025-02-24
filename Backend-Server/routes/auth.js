@@ -72,7 +72,7 @@ module.exports = function (app) {
                 // Check if user already exists
                 const existingUser = db.query('SELECT id FROM Users WHERE email = ?', [email]);
                 console.log(existingUser);
-                if (existingUser) {
+                if (existingUser != []) {
                     return res.status(400).json({
                         status: 400,
                         message: 'User already exists'
