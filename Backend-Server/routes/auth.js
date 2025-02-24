@@ -72,17 +72,12 @@ module.exports = function (app) {
                 // Check if user already exists
                 const existingUser = db.query('SELECT id FROM Users WHERE email = ?', [email]);
                 console.log(existingUser);
-                if (existingUser != []) {
-                    return res.status(400).json({
-                        status: 400,
-                        message: 'User already exists'
-                    });
-                }
+
 
                 // Hash password
                 const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(password, salt);
-
+                console.log(hashedPassword);
                 // Insert new user
                 const result = db.run(`
             INSERT INTO Users (email, password, fullname, role, department)
