@@ -64,13 +64,13 @@ module.exports = function (app) {
         });
 
     // Register endpoint
-    app.post('/register', requiredparms(["email", "password", "full_name", "role", "department"]),
+    app.post('/register',
         async function (req, res) {
             const { email, password, full_name, role, department } = req.body;
 
             try {
                 // Check if user already exists
-                const existingUser = db.getOne('SELECT id FROM Users WHERE email = ?', [email]);
+                const existingUser = db.query('SELECT id FROM Users WHERE email = ?', [email]);
                 if (existingUser) {
                     return res.status(400).json({
                         status: 400,
