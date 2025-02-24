@@ -12,7 +12,7 @@ module.exports = function (app) {
 
             try {
                 // Get user from database
-                const user = db.getall(`
+                const user = db.query(`
                 SELECT id, email, password, full_name , role, department 
                 FROM users 
                 WHERE email = ?
