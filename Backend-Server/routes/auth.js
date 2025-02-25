@@ -50,7 +50,13 @@ module.exports = function (app) {
                 // Remove password from user object
                 delete user.password;
 
-
+   res.set({
+                    'Access-Control-Allow-Origin': 'https://tbrhub.com',
+                    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+                    'Access-Control-Allow-Credentials': 'true'
+                });
+                
                 return res.status(200).json({
                     token,
                     user
