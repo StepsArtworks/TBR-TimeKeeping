@@ -7,7 +7,7 @@ const bodyParser = require('body-parser');
 const app = express();
 var port = 7777;
 app.use(cors({
-  origin: '*'
+  origin: 'htpps://api.tbrhub.com'
 }));
 
 var accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {
