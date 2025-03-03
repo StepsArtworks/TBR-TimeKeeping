@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
-import { AuthProvider } from './components/AuthProvider';
+import { AuthProvider, useAuth } from './components/AuthProvider';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { TimeEntries } from './pages/TimeEntries';
@@ -14,7 +14,6 @@ import { Team } from './pages/Team';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { UserManagement } from './pages/UserManagement';
-import { useAuth } from './components/AuthProvider';
 
 // Get the base path from the Vite config or default to '/tbrtimekeeping'
 const BASE_PATH = '/tbrtimekeeping';
@@ -31,17 +30,17 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to={`${BASE_PATH}/login`} />;
+    return <Navigate to={`${BASE_PATH}/login`} replace />;
   }
 
   // Redirect admin users to user management
   if (user.role === 'admin' && window.location.pathname !== `${BASE_PATH}/users`) {
-    return <Navigate to={`${BASE_PATH}/users`} />;
+    return <Navigate to={`${BASE_PATH}/users`} replace />;
   }
 
   // Prevent non-admin users from accessing user management
   if (user.role !== 'admin' && window.location.pathname === `${BASE_PATH}/users`) {
-    return <Navigate to={`${BASE_PATH}/`} />;
+    return <Navigate to={`${BASE_PATH}/`} replace />;
   }
 
   return (

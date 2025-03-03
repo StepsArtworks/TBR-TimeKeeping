@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login, logout, useCurrentUser } from '../lib/api';
+import { login as loginApi, logout as logoutApi, useCurrentUser } from '../lib/api';
 
 // Base path for the application
 const BASE_PATH = '/tbrtimekeeping';
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // If there's an error fetching the user, clear the stored user
         setUser(null);
         localStorage.removeItem('user');
-        navigate('/login');
+        navigate(`${BASE_PATH}/login`);
       }
       setLoading(false);
     }
@@ -50,23 +50,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleLogin = async (email: string, password: string) => {
     try {
-      const data = await login(email, password);
+      setLoading(true);
+      const data = await loginApi(email, password);
       setUser(data.user);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setLoading(false);
+      // Use replace: true to prevent going back to login page
       navigate('/', { replace: true });
     } catch (error) {
+      setLoading(false);
       throw error;
     }
   };
 
   const handleLogout = async () => {
     try {
-      await logout();
+      setLoading(true);
+      await logoutApi();
       setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+      setLoading(false);
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
       // Still clear user state even if API call fails
       setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+      setLoading(false);
       navigate('/login');
     }
   };
