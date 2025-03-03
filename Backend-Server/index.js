@@ -1,10 +1,12 @@
 var fs = require("fs");
 var path = require('path');
+var cors = require('cors')
 var morgan = require('morgan');
 const express = require('express')
 const bodyParser = require('body-parser');
 const app = express();
 var port = 7777;
+app.use(cors());
 
 var accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {
   flags: 'a'
