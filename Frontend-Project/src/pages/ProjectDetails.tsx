@@ -17,87 +17,48 @@ import { TaskList } from '../components/projects/TaskList';
 import { KanbanBoard } from '../components/projects/KanbanBoard';
 import { TeamManagement } from '../components/projects/TeamManagement';
 import { ProjectAnalytics } from '../components/projects/ProjectAnalytics';
-import { useProjectAnalytics } from '../hooks/useProjectAnalytics';
+import { useProjectById, useTasks, useProjectAnalytics, updateTask, useUsers } from '../lib/api';
 import { formatCurrency } from '../lib/utils';
-import { db } from '../lib/db';
+import { useAuth } from '../components/AuthProvider';
 
 export function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [project, setProject] = useState<Project | null>(null);
-  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
-  const [team, setTeam] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('board');
+  const [team, setTeam] = useState<User[]>([]);
 
-  const analytics = useProjectAnalytics(id!);
+  // Get project details from API
+  const { project, loading: projectLoading, error: projectError } = useProjectById(id || '');
 
+  // Get project tasks from API
+  const { tasks: projectTasks, loading: tasksLoading, error: tasksError } = useTasks(id);
+
+  // Get project analytics from API
+  const { metrics, timeData, taskData, loading: analyticsLoading, error: analyticsError } = useProjectAnalytics(id || '');
+
+  // Get all users from API
+  const { users: allUsers, loading: usersLoading, error: usersError } = useUsers();
+
+  // Set team members based on task assignments
   useEffect(() => {
-    async function loadProjectDetails() {
-      if (!id) {
-        setError('Project ID is missing');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Load project from IndexedDB
-        const project = await db.projects.get(id);
-        if (!project) {
-          throw new Error('Project not found');
-        }
-        setProject(project);
-
-        // Load project tasks
-        const tasks = await db.tasks
-          .where('project_id')
-          .equals(id)
-          .toArray();
-        setProjectTasks(tasks);
-
-        // Get unique assigned user IDs
-        const assignedUserIds = new Set(tasks.map(t => t.assigned_to).filter(Boolean));
-
-        // Load team members
-        const teamMembers = await db.users
-          .where('id')
-          .anyOf([...assignedUserIds])
-          .toArray();
-        setTeam(teamMembers);
-
-      } catch (err) {
-        console.error('Error loading project details:', err);
-        setError('Failed to load project details. The project may have been deleted.');
-        // Redirect to projects page after a delay if project not found
-        setTimeout(() => navigate('/projects'), 3000);
-      } finally {
-        setLoading(false);
-      }
+    if (projectTasks && allUsers) {
+      // Get unique assigned user IDs
+      const assignedUserIds = new Set(projectTasks.map(t => t.assigned_to).filter(Boolean));
+      
+      // Filter team members
+      const teamMembers = allUsers.filter(user => assignedUserIds.has(user.id));
+      setTeam(teamMembers);
     }
+  }, [projectTasks, allUsers]);
 
-    loadProjectDetails();
-  }, [id, navigate]);
+  const loading = projectLoading || tasksLoading || analyticsLoading || usersLoading;
+  const error = projectError || tasksError || analyticsError || usersError;
 
   const handleTaskUpdate = async (taskId: string, newStatus: Task['status']) => {
     try {
-      await db.tasks.update(taskId, {
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      });
-      
-      // Update local state
-      setProjectTasks(tasks => 
-        tasks.map(task => 
-          task.id === taskId 
-            ? { ...task, status: newStatus }
-            : task
-        )
-      );
+      await updateTask(taskId, { status: newStatus });
     } catch (err) {
       console.error('Error updating task:', err);
     }
@@ -105,7 +66,7 @@ export function ProjectDetails() {
 
   const handleAssignTeamMember = async (userId: string) => {
     try {
-      const user = await db.users.get(userId);
+      const user = allUsers?.find(u => u.id === userId);
       if (user && !team.find(t => t.id === userId)) {
         setTeam([...team, user]);
       }
@@ -119,22 +80,9 @@ export function ProjectDetails() {
       setTeam(team.filter(t => t.id !== userId));
       
       // Update tasks assigned to this user
-      const userTasks = projectTasks.filter(t => t.assigned_to === userId);
-      for (const task of userTasks) {
-        await db.tasks.update(task.id, {
-          assigned_to: null,
-          updated_at: new Date().toISOString()
-        });
+      for (const task of projectTasks.filter(t => t.assigned_to === userId)) {
+        await updateTask(task.id, { assigned_to: null });
       }
-      
-      // Update local state
-      setProjectTasks(tasks =>
-        tasks.map(task =>
-          task.assigned_to === userId
-            ? { ...task, assigned_to: null }
-            : task
-        )
-      );
     } catch (err) {
       console.error('Error removing team member:', err);
     }
@@ -248,12 +196,12 @@ export function ProjectDetails() {
         </div>
       )}
 
-      {!analytics.loading && !analytics.error && (
+      {!analyticsLoading && !analyticsError && (
         <ProjectAnalytics
           projectId={id!}
-          metrics={analytics.metrics}
-          timeData={analytics.timeData}
-          taskData={analytics.taskData}
+          metrics={metrics}
+          timeData={timeData}
+          taskData={taskData}
         />
       )}
 
@@ -286,7 +234,7 @@ export function ProjectDetails() {
       {viewMode === 'board' ? (
         <KanbanBoard tasks={projectTasks} onTaskUpdate={handleTaskUpdate} />
       ) : (
-        <TaskList tasks={projectTasks} onTaskUpdate={handleTaskUpdate} />
+        <TaskList tasks={projectTasks} onTaskUpdate={handleTaskUpdate} onEdit={() => {}} />
       )}
 
       <TeamManagement

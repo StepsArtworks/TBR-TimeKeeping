@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { timeEntries, projects } from '../lib/mockData';
+import { useProjects, useTimeEntries } from '../lib/api';
 import { useAuth } from '../components/AuthProvider';
 import { formatHours } from '../lib/utils';
 
@@ -14,13 +14,16 @@ export function Reports() {
     new Date().toISOString().split('T')[0]
   );
 
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+  const { entries: timeEntries, loading: entriesLoading, error: entriesError } = useTimeEntries(startDate, endDate);
+
+  const loading = projectsLoading || entriesLoading;
+  const error = projectsError || entriesError;
+
   // Calculate report data
   const reportData = projects.map(project => {
     const projectEntries = timeEntries.filter(
-      entry => 
-        entry.project_id === project.id &&
-        entry.date >= startDate &&
-        entry.date <= endDate
+      entry => entry.project_id === project.id
     );
 
     const totalHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -34,6 +37,27 @@ export function Reports() {
       billableHours,
     };
   });
+
+  if (loading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading report data...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

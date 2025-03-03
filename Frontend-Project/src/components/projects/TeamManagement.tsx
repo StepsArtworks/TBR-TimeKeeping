@@ -8,7 +8,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { User as UserType } from '../../types';
-import { users } from '../../lib/mockData';
+import { useUsers } from '../../lib/api';
 
 interface TeamManagementProps {
   members: UserType[];
@@ -25,10 +25,13 @@ export function TeamManagement({
   const [selectedUserId, setSelectedUserId] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Get all users from API
+  const { users, loading: usersLoading, error: usersError } = useUsers();
+
   // Get available users (not already in team)
-  const availableUsers = users.filter(
+  const availableUsers = users?.filter(
     user => !members.find(member => member.id === user.id)
-  );
+  ) || [];
 
   const handleAddMember = async () => {
     if (!selectedUserId) return;
@@ -57,6 +60,27 @@ export function TeamManagement({
       setLoading(false);
     }
   };
+
+  if (usersLoading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading users...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (usersError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{usersError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

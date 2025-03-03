@@ -4,8 +4,8 @@ import { TimeEntriesList } from '../components/time-entries/TimeEntriesList';
 import { TimeEntriesFilter } from '../components/time-entries/TimeEntriesFilter';
 import { TimeEntriesSummary } from '../components/time-entries/TimeEntriesSummary';
 import { useTimeEntries } from '../hooks/useTimeEntries';
-import { db } from '../lib/db';
-import { Project, TimeEntry } from '../types';
+import { useProjects } from '../lib/api';
+import { TimeEntry } from '../types';
 
 export function TimeEntries() {
   const {
@@ -18,18 +18,15 @@ export function TimeEntries() {
   } = useTimeEntries();
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
-  // Use live query for projects
-  const projects = useLiveQuery(
-    () => db.projects.orderBy('name').toArray(),
-    []
-  );
+  // Get projects from API
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
 
   const handleEdit = (entry: TimeEntry) => {
     setEditingEntry(entry);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  if (!projects) {
+  if (projectsLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -38,6 +35,14 @@ export function TimeEntries() {
             Loading...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (projectsError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{projectsError}</p>
       </div>
     );
   }
@@ -67,7 +72,7 @@ export function TimeEntries() {
         startDate={filter.startDate}
         endDate={filter.endDate}
         projectId={filter.projectId}
-        projects={projects}
+        projects={projects || []}
         onFilterChange={setFilter}
       />
 

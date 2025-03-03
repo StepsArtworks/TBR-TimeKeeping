@@ -5,7 +5,7 @@ import { useAuth } from '../components/AuthProvider';
 
 export function Login() {
   const navigate = useNavigate();
-  const { user, login, loading: authLoading } = useAuth();
+  const { user, login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -27,9 +27,9 @@ export function Login() {
 
     try {
       await login(formData.email, formData.password);
-      // The navigation is handled in the AuthProvider
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
+    } finally {
       setLoading(false);
     }
   };
@@ -103,10 +103,10 @@ export function Login() {
 
             <button
               type="submit"
-              disabled={loading || authLoading}
+              disabled={loading}
               className="w-full rounded-lg bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-primary-500 dark:hover:bg-primary-600"
             >
-              {loading || authLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   <span className="ml-2">Signing in...</span>

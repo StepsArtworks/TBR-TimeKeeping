@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format, isValid } from 'date-fns';
 import { Clock, User, Edit2, AlertCircle } from 'lucide-react';
 import { Task } from '../../types';
@@ -33,17 +33,17 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
     error: entriesError 
   } = useTimeEntries();
 
-  // Calculate actual hours for each task
-  useEffect(() => {
+  // Calculate task hours
+  React.useEffect(() => {
     if (!timeEntries) return;
-
+    
     const hours = timeEntries.reduce((acc, entry) => {
       if (entry.task_id) {
         acc[entry.task_id] = (acc[entry.task_id] || 0) + entry.hours;
       }
       return acc;
     }, {} as Record<string, number>);
-
+    
     setTaskHours(hours);
   }, [timeEntries]);
 

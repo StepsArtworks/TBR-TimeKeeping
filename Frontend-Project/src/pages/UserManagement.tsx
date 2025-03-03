@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Mail, Building, AlertCircle, Edit2, Trash2, Lock } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
-import { db } from '../lib/db';
+import { useUsers, createUser, updateUser, deleteUser } from '../lib/api';
 import { User } from '../types';
 
 interface UserEditForm {
@@ -27,11 +27,8 @@ export function UserManagement() {
     department: '',
   });
 
-  // Use live query for users
-  const users = useLiveQuery(
-    () => db.users.toArray(),
-    []
-  );
+  // Get users from API
+  const { users, loading: usersLoading, error: usersError } = useUsers();
 
   // Only allow access to admin users
   if (user?.role !== 'admin') {
@@ -54,39 +51,17 @@ export function UserManagement() {
 
     try {
       if (editFormData.id) {
-        // Check if email is taken by another user
-        const existingUser = await db.users
-          .where('email')
-          .equals(editFormData.email)
-          .first();
-
-        if (existingUser && existingUser.id !== editFormData.id) {
-          throw new Error('This email is already taken by another user');
-        }
-
         // Update user
-        await db.users.update(editFormData.id, {
+        await updateUser(editFormData.id, {
           email: editFormData.email,
           full_name: editFormData.full_name,
           password: editFormData.password,
           role: editFormData.role,
           department: editFormData.department,
-          updated_at: new Date().toISOString(),
         });
       } else {
-        // Check if email already exists
-        const existingUser = await db.users
-          .where('email')
-          .equals(editFormData.email)
-          .first();
-
-        if (existingUser) {
-          throw new Error('A user with this email already exists');
-        }
-
         // Create new user
-        await db.users.add({
-          id: crypto.randomUUID(),
+        await createUser({
           email: editFormData.email,
           full_name: editFormData.full_name,
           password: editFormData.password,
@@ -95,9 +70,7 @@ export function UserManagement() {
           vacation_balance: 20,
           sick_balance: 10,
           personal_balance: 5,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+        } as Omit<User, 'id'>);
       }
 
       setShowForm(false);
@@ -133,23 +106,14 @@ export function UserManagement() {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      await db.transaction('rw', [db.users, db.timeEntries, db.leaveRequests], async () => {
-        // Delete user's time entries
-        await db.timeEntries.where('user_id').equals(userId).delete();
-
-        // Delete user's leave requests
-        await db.leaveRequests.where('user_id').equals(userId).delete();
-
-        // Delete user
-        await db.users.delete(userId);
-      });
+      await deleteUser(userId);
     } catch (err) {
       console.error('Error deleting user:', err);
       alert('Failed to delete user');
     }
   };
 
-  if (!users) {
+  if (usersLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -158,6 +122,14 @@ export function UserManagement() {
             Loading...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (usersError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{usersError}</p>
       </div>
     );
   }
@@ -363,7 +335,7 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
-              {users.map((u) => (
+              {users?.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center">

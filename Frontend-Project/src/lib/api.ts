@@ -14,20 +14,6 @@ const handleResponse = async (response: Response) => {
   return response.json();
 };
 
-// Helper function to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('authToken');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-};
-
 // Generic fetch hook
 export function useFetch<T>(url: string, dependencies: any[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -44,7 +30,14 @@ export function useFetch<T>(url: string, dependencies: any[] = []) {
         setLoading(true);
         setError(null);
 
-        const headers = getAuthHeaders();
+        const token = localStorage.getItem('authToken');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
 
         const response = await fetch(`${API_BASE_URL}${url}`, {
           method: 'GET',
@@ -79,20 +72,78 @@ export function useFetch<T>(url: string, dependencies: any[] = []) {
   return { data, loading, error };
 }
 
-// ==================== PROJECTS API ====================
-
-// Get all projects
+// API hooks for specific data types
 export function useProjects() {
   const { data, loading, error } = useFetch<Project[]>('/projects');
   
+  const createProject = useCallback(async (project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(project),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error('Error creating project:', err);
+      throw err;
+    }
+  }, []);
+
+  const updateProject = useCallback(async (id: string, project: Partial<Project>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(project),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error updating project ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
+  const deleteProject = useCallback(async (id: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error deleting project ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
   return {
     projects: data || [],
     loading,
     error,
+    createProject,
+    updateProject,
+    deleteProject,
   };
 }
 
-// Get project by ID
 export function useProjectById(id: string) {
   const { data, loading, error } = useFetch<Project>(`/projects/${id}`, [id]);
   
@@ -103,140 +154,78 @@ export function useProjectById(id: string) {
   };
 }
 
-// Create a new project
-export async function createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/projects`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(project),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error('Error creating project:', err);
-    throw err;
-  }
-}
-
-// Update an existing project
-export async function updateProject(id: string, project: Partial<Project>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(project),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error updating project ${id}:`, err);
-    throw err;
-  }
-}
-
-// Delete a project
-export async function deleteProject(id: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error deleting project ${id}:`, err);
-    throw err;
-  }
-}
-
-// ==================== TASKS API ====================
-
-// Get all tasks, optionally filtered by project
 export function useTasks(projectId?: string) {
   const url = projectId ? `/tasks?project_id=${projectId}` : '/tasks';
   const { data, loading, error } = useFetch<Task[]>(url, [projectId]);
   
+  const createTask = useCallback(async (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(task),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error('Error creating task:', err);
+      throw err;
+    }
+  }, []);
+
+  const updateTask = useCallback(async (id: string, task: Partial<Task>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(task),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error updating task ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
+  const deleteTask = useCallback(async (id: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error deleting task ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
   return {
     tasks: data || [],
     loading,
     error,
+    createTask,
+    updateTask,
+    deleteTask,
   };
 }
 
-// Get task by ID
-export function useTaskById(id: string) {
-  const { data, loading, error } = useFetch<Task>(`/tasks/${id}`, [id]);
-  
-  return {
-    task: data,
-    loading,
-    error,
-  };
-}
-
-// Create a new task
-export async function createTask(task: Omit<Task, 'id'>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/tasks`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(task),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error('Error creating task:', err);
-    throw err;
-  }
-}
-
-// Update an existing task
-export async function updateTask(id: string, task: Partial<Task>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(task),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error updating task ${id}:`, err);
-    throw err;
-  }
-}
-
-// Delete a task
-export async function deleteTask(id: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error deleting task ${id}:`, err);
-    throw err;
-  }
-}
-
-// ==================== TIME ENTRIES API ====================
-
-// Get time entries with optional filters
 export function useTimeEntries(startDate?: string, endDate?: string, projectId?: string) {
   let url = '/time-entries';
   const params = new URLSearchParams();
@@ -250,155 +239,145 @@ export function useTimeEntries(startDate?: string, endDate?: string, projectId?:
   
   const { data, loading, error } = useFetch<TimeEntry[]>(url, [startDate, endDate, projectId]);
   
+  const createTimeEntry = useCallback(async (entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/time-entries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(entry),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error('Error creating time entry:', err);
+      throw err;
+    }
+  }, []);
+
+  const updateTimeEntry = useCallback(async (id: string, entry: Partial<TimeEntry>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(entry),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error updating time entry ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
+  const deleteTimeEntry = useCallback(async (id: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error deleting time entry ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
   return {
     entries: data || [],
     loading,
     error,
+    createTimeEntry,
+    updateTimeEntry,
+    deleteTimeEntry,
   };
 }
 
-// Get time entry by ID
-export function useTimeEntryById(id: string) {
-  const { data, loading, error } = useFetch<TimeEntry>(`/time-entries/${id}`, [id]);
-  
-  return {
-    entry: data,
-    loading,
-    error,
-  };
-}
-
-// Create a new time entry
-export async function createTimeEntry(entry: Omit<TimeEntry, 'id'>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/time-entries`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(entry),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error('Error creating time entry:', err);
-    throw err;
-  }
-}
-
-// Update an existing time entry
-export async function updateTimeEntry(id: string, entry: Partial<TimeEntry>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(entry),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error updating time entry ${id}:`, err);
-    throw err;
-  }
-}
-
-// Delete a time entry
-export async function deleteTimeEntry(id: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error deleting time entry ${id}:`, err);
-    throw err;
-  }
-}
-
-// ==================== LEAVE REQUESTS API ====================
-
-// Get all leave requests for the current user
 export function useLeaveRequests() {
   const { data, loading, error } = useFetch<LeaveRequest[]>('/leave-requests');
   
+  const createLeaveRequest = useCallback(async (request: Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leave-requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(request),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error('Error creating leave request:', err);
+      throw err;
+    }
+  }, []);
+
+  const updateLeaveRequest = useCallback(async (id: string, request: Partial<LeaveRequest>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leave-requests/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(request),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error updating leave request ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
+  const deleteLeaveRequest = useCallback(async (id: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leave-requests/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error deleting leave request ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
   return {
     requests: data || [],
     loading,
     error,
+    createLeaveRequest,
+    updateLeaveRequest,
+    deleteLeaveRequest,
   };
 }
 
-// Get leave request by ID
-export function useLeaveRequestById(id: string) {
-  const { data, loading, error } = useFetch<LeaveRequest>(`/leave-requests/${id}`, [id]);
-  
-  return {
-    request: data,
-    loading,
-    error,
-  };
-}
-
-// Create a new leave request
-export async function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'approved_by' | 'approved_at'>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/leave-requests`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(request),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error('Error creating leave request:', err);
-    throw err;
-  }
-}
-
-// Update an existing leave request
-export async function updateLeaveRequest(id: string, request: Partial<LeaveRequest>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/leave-requests/${id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(request),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error updating leave request ${id}:`, err);
-    throw err;
-  }
-}
-
-// Delete a leave request
-export async function deleteLeaveRequest(id: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/leave-requests/${id}`, {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error deleting leave request ${id}:`, err);
-    throw err;
-  }
-}
-
-// Get leave balances for the current user
 export function useLeaveBalances() {
   const { data, loading, error } = useFetch<{
     vacation: number;
@@ -413,79 +392,77 @@ export function useLeaveBalances() {
   };
 }
 
-// ==================== LEAVE APPROVALS API ====================
-
-// Get leave requests pending approval (for leads and managers)
-export function useLeaveApprovals() {
-  const { data, loading, error } = useFetch<{
-    pendingRequests: (LeaveRequest & { 
-      user: User;
-      leave_balance: number;
-    })[];
-    approvedRequests: (LeaveRequest & { 
-      user: User;
-      leave_balance: number;
-    })[];
-  }>('/leave-approvals');
-  
-  return {
-    pendingRequests: data?.pendingRequests || [],
-    approvedRequests: data?.approvedRequests || [],
-    loading,
-    error,
-  };
-}
-
-// Approve a leave request
-export async function approveRequest(id: string, notes: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/leave-requests/${id}/approve`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ notes }),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error approving leave request ${id}:`, err);
-    throw err;
-  }
-}
-
-// Reject a leave request
-export async function rejectRequest(id: string, notes: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/leave-requests/${id}/reject`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ notes }),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error rejecting leave request ${id}:`, err);
-    throw err;
-  }
-}
-
-// ==================== USERS API ====================
-
-// Get all users
 export function useUsers() {
   const { data, loading, error } = useFetch<User[]>('/users');
   
+  const createUser = useCallback(async (user: Omit<User, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(user),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error('Error creating user:', err);
+      throw err;
+    }
+  }, []);
+
+  const updateUser = useCallback(async (id: string, user: Partial<User>) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(user),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error updating user ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
+  const deleteUser = useCallback(async (id: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error deleting user ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
   return {
     users: data || [],
     loading,
     error,
+    createUser,
+    updateUser,
+    deleteUser,
   };
 }
 
-// Get user by ID
 export function useUserById(id: string) {
   const { data, loading, error } = useFetch<User>(`/users/${id}`, [id]);
   
@@ -496,62 +473,16 @@ export function useUserById(id: string) {
   };
 }
 
-// Create a new user
-export async function createUser(user: Omit<User, 'id'>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/users`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(user),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error('Error creating user:', err);
-    throw err;
-  }
+export function useCurrentUser() {
+  const { data, loading, error } = useFetch<User>('/users/me');
+  
+  return {
+    user: data,
+    loading,
+    error,
+  };
 }
 
-// Update an existing user
-export async function updateUser(id: string, user: Partial<User>) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(user),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error updating user ${id}:`, err);
-    throw err;
-  }
-}
-
-// Delete a user
-export async function deleteUser(id: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error deleting user ${id}:`, err);
-    throw err;
-  }
-}
-
-// ==================== TASK DEPENDENCIES API ====================
-
-// Get dependencies for a task
 export function useTaskDependencies(taskId: string) {
   const { data, loading, error } = useFetch<{
     id: string;
@@ -563,51 +494,53 @@ export function useTaskDependencies(taskId: string) {
     };
   }[]>(`/tasks/${taskId}/dependencies`, [taskId]);
   
+  const addDependency = useCallback(async (dependsOnTaskId: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/dependencies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error('Error adding task dependency:', err);
+      throw err;
+    }
+  }, [taskId]);
+
+  const removeDependency = useCallback(async (dependencyId: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/task-dependencies/${dependencyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error removing task dependency ${dependencyId}:`, err);
+      throw err;
+    }
+  }, []);
+
   return {
     dependencies: data || [],
     loading,
     error,
+    addDependency,
+    removeDependency,
   };
 }
 
-// Add a dependency to a task
-export async function addDependency(taskId: string, dependsOnTaskId: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/dependencies`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }),
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error('Error adding task dependency:', err);
-    throw err;
-  }
-}
-
-// Remove a dependency from a task
-export async function removeDependency(dependencyId: string) {
-  try {
-    const headers = getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/task-dependencies/${dependencyId}`, {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-    });
-    
-    return await handleResponse(response);
-  } catch (err: any) {
-    console.error(`Error removing task dependency ${dependencyId}:`, err);
-    throw err;
-  }
-}
-
-// ==================== PROJECT ANALYTICS API ====================
-
-// Get analytics for a project
 export function useProjectAnalytics(projectId: string) {
   const { data, loading, error } = useFetch<{
     metrics: {
@@ -642,9 +575,6 @@ export function useProjectAnalytics(projectId: string) {
   };
 }
 
-// ==================== DASHBOARD STATS API ====================
-
-// Get dashboard statistics
 export function useStats() {
   const { data, loading, error } = useFetch<{
     weeklyHours: number;
@@ -700,9 +630,69 @@ export function useStats() {
   };
 }
 
-// ==================== AUTHENTICATION API ====================
+export function useLeaveApprovals() {
+  const { data, loading, error } = useFetch<{
+    pendingRequests: (LeaveRequest & { 
+      user: User;
+      leave_balance: number;
+    })[];
+    approvedRequests: (LeaveRequest & { 
+      user: User;
+      leave_balance: number;
+    })[];
+  }>('/leave-approvals');
+  
+  const approveRequest = useCallback(async (id: string, notes: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leave-requests/${id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ notes }),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error approving leave request ${id}:`, err);
+      throw err;
+    }
+  }, []);
 
-// Login
+  const rejectRequest = useCallback(async (id: string, notes: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leave-requests/${id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ notes }),
+        credentials: 'include',
+      });
+      
+      return await handleResponse(response);
+    } catch (err: any) {
+      console.error(`Error rejecting leave request ${id}:`, err);
+      throw err;
+    }
+  }, []);
+
+  return {
+    pendingRequests: data?.pendingRequests || [],
+    approvedRequests: data?.approvedRequests || [],
+    loading,
+    error,
+    approveRequest,
+    rejectRequest,
+  };
+}
+
+// Authentication functions
 export async function login(email: string, password: string) {
   try {
     const response = await fetch(`${API_BASE_URL}/login`, {
@@ -731,13 +721,14 @@ export async function login(email: string, password: string) {
   }
 }
 
-// Logout
 export async function logout() {
   try {
-    const headers = getAuthHeaders();
+    const token = localStorage.getItem('authToken');
     await fetch(`${API_BASE_URL}/logout`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
       credentials: 'include',
     });
     
@@ -753,7 +744,6 @@ export async function logout() {
   }
 }
 
-// Reset password
 export async function resetPassword(email: string) {
   try {
     const response = await fetch(`${API_BASE_URL}/reset-password`, {
@@ -774,13 +764,15 @@ export async function resetPassword(email: string) {
   }
 }
 
-// Update password
 export async function updatePassword(password: string) {
   try {
-    const headers = getAuthHeaders();
+    const token = localStorage.getItem('authToken');
     const response = await fetch(`${API_BASE_URL}/update-password`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify({ password }),
       credentials: 'include',
     });

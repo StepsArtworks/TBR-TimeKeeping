@@ -5,7 +5,7 @@ import { ProjectFilters } from '../components/projects/ProjectFilters';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import { useAuth } from '../components/AuthProvider';
 import { Project } from '../types';
-import { db } from '../lib/db';
+import { useProjects, createProject, updateProject, deleteProject } from '../lib/api';
 
 export function Projects() {
   const { user } = useAuth();
@@ -23,90 +23,51 @@ export function Projects() {
   // Check if user can add projects (management or lead)
   const canAddProjects = user?.role === 'management' || user?.role === 'lead';
 
-  // Use live query for projects with filtering
-  const projects = useLiveQuery(
-    async () => {
-      if (!user) return [];
+  // Get projects from API
+  const { projects, loading, error } = useProjects();
 
-      try {
-        // Get all projects and tasks in one go to minimize database calls
-        const [allProjects, allTasks] = await Promise.all([
-          db.projects.toArray(),
-          db.tasks.toArray(),
-        ]);
+  // Filter projects based on search, status, dates
+  const filteredProjects = React.useMemo(() => {
+    let result = [...projects];
 
-        // Filter projects based on user role and assignments
-        let filteredProjects = allProjects;
+    // Apply search filter
+    if (filter.search) {
+      const searchLower = filter.search.toLowerCase();
+      result = result.filter(project =>
+        project.name.toLowerCase().includes(searchLower) ||
+        project.description.toLowerCase().includes(searchLower)
+      );
+    }
 
-        if (user.role === 'user') {
-          // Users can see projects where:
-          // 1. They are assigned to any task in the project
-          const userProjectIds = new Set(
-            allTasks
-              .filter(task => task.assigned_to === user.id)
-              .map(task => task.project_id)
-          );
+    // Apply status filter
+    if (filter.status) {
+      result = result.filter(project => project.status === filter.status);
+    }
 
-          filteredProjects = allProjects.filter(project =>
-            userProjectIds.has(project.id)
-          );
-        } else if (user.role === 'lead') {
-          // Leads can see all projects in their department
-          filteredProjects = allProjects.filter(project => {
-            const projectTasks = allTasks.filter(task => task.project_id === project.id);
-            return projectTasks.some(() => user.department === 'Engineering');
-          });
-        }
-        // Management can see all projects
+    // Apply date filters
+    if (filter.startDate) {
+      result = result.filter(project => project.start_date >= filter.startDate);
+    }
 
-        // Apply search filter
-        if (filter.search) {
-          const searchLower = filter.search.toLowerCase();
-          filteredProjects = filteredProjects.filter(project =>
-            project.name.toLowerCase().includes(searchLower) ||
-            project.description.toLowerCase().includes(searchLower)
-          );
-        }
+    if (filter.endDate) {
+      result = result.filter(project =>
+        project.end_date ? project.end_date <= filter.endDate : true
+      );
+    }
 
-        // Apply status filter
-        if (filter.status) {
-          filteredProjects = filteredProjects.filter(project =>
-            project.status === filter.status
-          );
-        }
-
-        // Apply date filters
-        if (filter.startDate) {
-          filteredProjects = filteredProjects.filter(project =>
-            project.start_date >= filter.startDate
-          );
-        }
-
-        if (filter.endDate) {
-          filteredProjects = filteredProjects.filter(project =>
-            project.end_date ? project.end_date <= filter.endDate : true
-          );
-        }
-
-        // Apply sorting
-        return filteredProjects.sort((a, b) => {
-          if (filter.sortBy === 'name') {
-            return a.name.localeCompare(b.name);
-          } else {
-            const aDate = a.end_date || '9999-12-31';
-            const bDate = b.end_date || '9999-12-31';
-            return aDate.localeCompare(bDate);
-          }
-        });
-      } catch (err) {
-        console.error('Error loading projects:', err);
-        return [];
+    // Apply sorting
+    return result.sort((a, b) => {
+      if (filter.sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      } else {
+        const aDate = a.end_date || '9999-12-31';
+        const bDate = b.end_date || '9999-12-31';
+        return aDate.localeCompare(bDate);
       }
-    },
-    [filter, user]
-  );
+    });
+  }, [projects, filter]);
 
-  const handleProjectSave = () => {
+  const handleProjectSave = async () => {
     setShowForm(false);
     setEditingProject(null);
   };
@@ -122,24 +83,14 @@ export function Projects() {
     }
 
     try {
-      // Start a transaction to ensure all related data is deleted
-      await db.transaction('rw', [db.projects, db.tasks, db.timeEntries], async () => {
-        // Delete all related tasks first
-        await db.tasks.where('project_id').equals(projectId).delete();
-
-        // Delete all related time entries
-        await db.timeEntries.where('project_id').equals(projectId).delete();
-
-        // Finally delete the project
-        await db.projects.delete(projectId);
-      });
+      await deleteProject(projectId);
     } catch (err) {
       console.error('Error deleting project:', err);
       alert('Failed to delete project. Please try again.');
     }
   };
 
-  if (!projects) {
+  if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-center">
@@ -148,6 +99,14 @@ export function Projects() {
             Loading projects...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
       </div>
     );
   }
@@ -231,7 +190,7 @@ export function Projects() {
       )}
 
       <ProjectList
-        projects={projects}
+        projects={filteredProjects}
         loading={false}
         error={null}
         canEdit={canAddProjects}

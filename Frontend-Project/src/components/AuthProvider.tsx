@@ -1,14 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login as loginApi, logout as logoutApi } from '../lib/api';
-import { User } from '../types';
-import jwtDecode from 'jwt-decode';
 
 // Base path for the application
 const BASE_PATH = '/tbrtimekeeping';
 
 interface AuthContextType {
-  user: User | null;
+  user: any;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,76 +22,95 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  
+  // Get the user from localStorage initially
+  const [user, setUser] = useState<any>(() => {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
-  // Check for token and set user on initial load
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+    // Check if we have a token
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
+    // Verify token by making an API call to get current user
+    const verifyToken = async () => {
       try {
-        // Verify token expiration
-        const decoded: any = jwtDecode(token);
-        const currentTime = Date.now() / 1000;
+        const response = await fetch('https://api.tbrhub.com/users/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        if (decoded.exp && decoded.exp < currentTime) {
-          // Token expired
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+        } else {
+          // Token is invalid
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
           setUser(null);
-          setLoading(false);
-          return;
-        }
-
-        // Token is valid, get user from localStorage
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        } else {
-          setUser(null);
         }
       } catch (error) {
-        console.error('Error decoding token:', error);
+        console.error('Error verifying token:', error);
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
-    checkAuth();
+    verifyToken();
   }, []);
 
   const handleLogin = async (email: string, password: string) => {
     try {
-      setLoading(true);
-      const data = await loginApi(email, password);
+      const response = await fetch('https://api.tbrhub.com/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Invalid credentials');
+      }
+
+      const data = await response.json();
       
-      // Store token and user in localStorage
+      // Store the JWT token
       localStorage.setItem('authToken', data.token);
+      
+      // Store user data
+      setUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      setUser(data.user);
-      setLoading(false);
-      
-      // Navigate to dashboard
       navigate('/', { replace: true });
     } catch (error) {
-      setLoading(false);
       throw error;
     }
   };
 
   const handleLogout = async () => {
     try {
-      setLoading(true);
-      await logoutApi();
+      const token = localStorage.getItem('authToken');
+      
+      // Call logout API if token exists
+      if (token) {
+        await fetch('https://api.tbrhub.com/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -101,8 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       setUser(null);
-      setLoading(false);
-      navigate('/login', { replace: true });
+      navigate('/login');
     }
   };
 
