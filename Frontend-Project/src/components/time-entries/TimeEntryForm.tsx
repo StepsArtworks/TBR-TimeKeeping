@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, FileText, DollarSign } from 'lucide-react';
-import { db } from '../../lib/db';
 import { Project, Task, TimeEntry } from '../../types';
 import { cn } from '../../lib/utils';
-import { useAuth } from '../../components/AuthProvider'; // Fixed import path
+import { useAuth } from '../../components/AuthProvider';
+import { useTasks, createTimeEntry, updateTimeEntry } from '../../lib/api';
 
 interface TimeEntryFormProps {
   onSubmit: () => void;
@@ -15,6 +15,7 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -25,38 +26,17 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
     isBillable: true,
   });
 
-  // Get tasks assigned to the user
-  const tasks = useLiveQuery(async () => {
-    if (!user) return [];
+  // Get tasks assigned to the user from API
+  const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
 
-    try {
-      let query = db.tasks
-        .where('assigned_to')
-        .equals(user.id)
-        .filter(task => task.status !== 'completed');
+  // Filter tasks assigned to the current user
+  const userTasks = tasks?.filter(task => 
+    task.assigned_to === user?.id && 
+    task.status !== 'completed'
+  ) || [];
 
-      const tasks = await query.toArray();
-
-      // Get the projects for these tasks
-      const projectIds = [...new Set(tasks.map(task => task.project_id))];
-      const projects = await db.projects
-        .where('id')
-        .anyOf(projectIds)
-        .toArray();
-
-      // Combine task and project data
-      return tasks.map(task => ({
-        ...task,
-        project: projects.find(p => p.id === task.project_id)
-      }));
-    } catch (err) {
-      console.error('Error loading tasks:', err);
-      return [];
-    }
-  }, [user]);
-
-  // Get selected task's project
-  const selectedTask = tasks?.find(t => t.id === formData.taskId);
+  // Get selected task
+  const selectedTask = userTasks.find(t => t.id === formData.taskId);
 
   useEffect(() => {
     if (entry) {
@@ -114,35 +94,25 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
     setError(null);
 
     try {
-      const timeEntry = {
-        id: entry?.id || crypto.randomUUID(),
-        user_id: user.id,
+      const timeEntryData: Partial<TimeEntry> = {
         project_id: selectedTask.project_id,
         task_id: formData.taskId,
         date: formData.date,
         hours,
         description: formData.description,
         is_billable: formData.isBillable,
-        created_at: entry?.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
 
-      await db.transaction('rw', [db.timeEntries, db.tasks], async () => {
-        if (entry) {
-          await db.timeEntries.update(entry.id, timeEntry);
-        } else {
-          await db.timeEntries.add(timeEntry);
-
-          // Update task status if it's not started
-          const task = await db.tasks.get(formData.taskId);
-          if (task && task.status === 'not_started') {
-            await db.tasks.update(formData.taskId, {
-              status: 'in_progress',
-              updated_at: new Date().toISOString()
-            });
-          }
-        }
-      });
+      if (entry) {
+        await updateTimeEntry(entry.id, timeEntryData);
+      } else {
+        // For new entries, we need to include the user_id
+        const newEntry: Omit<TimeEntry, 'id'> = {
+          ...timeEntryData as any,
+          user_id: user.id
+        };
+        await createTimeEntry(newEntry);
+      }
 
       setFormData({
         date: new Date().toISOString().split('T')[0],
@@ -162,7 +132,7 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
     }
   };
 
-  if (!tasks) {
+  if (tasksLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -171,6 +141,14 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
             Loading...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (tasksError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+        {tasksError}
       </div>
     );
   }
@@ -263,9 +241,9 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
               className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
             >
               <option value="">Select a task</option>
-              {tasks.map((task) => (
+              {userTasks.map((task) => (
                 <option key={task.id} value={task.id}>
-                  {task.project?.name} - {task.name}
+                  {task.name}
                 </option>
               ))}
             </select>

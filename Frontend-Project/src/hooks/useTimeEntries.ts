@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TimeEntry } from '../types';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../components/AuthProvider';
-import { db } from '../lib/db';
+import { useTimeEntries as useTimeEntriesApi, deleteTimeEntry } from '../lib/api';
 
 interface TimeEntriesFilter {
   startDate: string;
@@ -16,54 +16,38 @@ export function useTimeEntries() {
     startDate: startOfMonth(new Date()).toISOString().split('T')[0],
     endDate: endOfMonth(new Date()).toISOString().split('T')[0],
   });
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Use live query for time entries with filtering
-  const entries = useLiveQuery(
-    async () => {
-      if (!user) return [];
-
-      try {
-        let query = db.timeEntries
-          .where('user_id')
-          .equals(user.id)
-          .filter(entry =>
-            entry.date >= filter.startDate &&
-            entry.date <= filter.endDate
-          );
-
-        if (filter.projectId) {
-          query = query.filter(entry => entry.project_id === filter.projectId);
-        }
-
-        const entries = await query.toArray();
-
-        // Get projects and tasks for the entries
-        const projectIds = new Set(entries.map(e => e.project_id));
-        const taskIds = new Set(entries.map(e => e.task_id).filter(Boolean));
-
-        const [projects, tasks] = await Promise.all([
-          db.projects.where('id').anyOf([...projectIds]).toArray(),
-          db.tasks.where('id').anyOf([...taskIds]).toArray()
-        ]);
-
-        // Enrich entries with project and task data
-        return entries.map(entry => ({
-          ...entry,
-          project: projects.find(p => p.id === entry.project_id),
-          task: tasks.find(t => t.id === entry.task_id)
-        })).sort((a, b) => b.date.localeCompare(a.date));
-
-      } catch (err) {
-        console.error('Error loading time entries:', err);
-        return [];
-      }
-    },
-    [filter, user]
+  const { entries: apiEntries, loading: apiLoading, error: apiError } = useTimeEntriesApi(
+    filter.startDate,
+    filter.endDate,
+    filter.projectId
   );
 
-  const deleteEntry = async (id: string) => {
+  useEffect(() => {
+    if (apiLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (apiError) {
+      setError(apiError);
+      setLoading(false);
+      return;
+    }
+
+    setEntries(apiEntries);
+    setLoading(false);
+    setError(null);
+  }, [apiEntries, apiLoading, apiError]);
+
+  const handleDeleteEntry = async (id: string) => {
     try {
-      await db.timeEntries.delete(id);
+      await deleteTimeEntry(id);
+      // Remove the deleted entry from the local state
+      setEntries(entries.filter(entry => entry.id !== id));
     } catch (err) {
       console.error('Error deleting time entry:', err);
       throw err;
@@ -71,11 +55,11 @@ export function useTimeEntries() {
   };
 
   return {
-    entries: entries || [],
-    loading: !entries,
-    error: null,
+    entries,
+    loading,
+    error,
     filter,
     setFilter,
-    deleteEntry,
+    deleteEntry: handleDeleteEntry,
   };
 }

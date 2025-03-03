@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Project } from '../types';
-import { db } from '../lib/db';
 import { useAuth } from '../components/AuthProvider';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useProjects as useProjectsApi } from '../lib/api';
 
 export interface ProjectFilter {
   search: string;
@@ -18,53 +17,65 @@ export function useProjects() {
     search: '',
     sortBy: 'name',
   });
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Use Dexie's live query to automatically update when data changes
-  const projects = useLiveQuery(async () => {
-    if (!user) return [];
+  const { projects: apiProjects, loading: apiLoading, error: apiError } = useProjectsApi();
+
+  useEffect(() => {
+    if (apiLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (apiError) {
+      setError(apiError);
+      setLoading(false);
+      return;
+    }
 
     try {
-      // Get all projects first
-      let projects = await db.projects.toArray();
-
       // Apply filters
+      let filteredProjects = [...apiProjects];
+
       if (filter.search) {
-        projects = projects.filter(project =>
-          project.name.toLowerCase().includes(filter.search.toLowerCase())
+        const searchLower = filter.search.toLowerCase();
+        filteredProjects = filteredProjects.filter(project =>
+          project.name.toLowerCase().includes(searchLower) ||
+          project.description.toLowerCase().includes(searchLower)
         );
       }
 
       if (filter.status) {
-        projects = projects.filter(project => project.status === filter.status);
+        filteredProjects = filteredProjects.filter(project => project.status === filter.status);
       }
 
       if (filter.startDate) {
-        projects = projects.filter(project => project.start_date >= filter.startDate);
+        filteredProjects = filteredProjects.filter(project =>
+          project.start_date >= filter.startDate
+        );
       }
 
       if (filter.endDate) {
-        projects = projects.filter(project =>
+        filteredProjects = filteredProjects.filter(project =>
           project.end_date ? project.end_date <= filter.endDate : true
         );
       }
 
       // Filter based on user role
-      if (user.role === 'lead') {
-        const tasks = await db.tasks.toArray();
-        projects = projects.filter(project => {
-          const projectTasks = tasks.filter(task => task.project_id === project.id);
-          return projectTasks.some(() => user.department === 'Engineering');
+      if (user?.role === 'lead') {
+        filteredProjects = filteredProjects.filter(project => {
+          // For leads, show projects in their department
+          return user.department === 'Engineering';
         });
-      } else if (user.role === 'user') {
-        const tasks = await db.tasks.toArray();
-        projects = projects.filter(project => {
-          const projectTasks = tasks.filter(task => task.project_id === project.id);
-          return projectTasks.some(task => task.assigned_to === user.id);
-        });
+      } else if (user?.role === 'user') {
+        // For regular users, only show projects they're assigned to
+        // This filtering is already done on the server side
       }
 
       // Apply sorting
-      return projects.sort((a, b) => {
+      filteredProjects.sort((a, b) => {
         if (filter.sortBy === 'name') {
           return a.name.localeCompare(b.name);
         } else {
@@ -73,18 +84,28 @@ export function useProjects() {
           return aDate.localeCompare(bDate);
         }
       });
+
+      setProjects(filteredProjects);
+      setLoading(false);
+      setError(null);
     } catch (err) {
-      console.error('Error loading projects:', err);
-      return [];
+      console.error('Error filtering projects:', err);
+      setError('Failed to process projects');
+      setLoading(false);
     }
-  }, [filter, user]);
+  }, [apiProjects, apiLoading, apiError, filter, user]);
+
+  const refresh = () => {
+    setLoading(true);
+    // The API hook will handle the refresh
+  };
 
   return {
-    projects: projects || [],
-    loading: !projects,
-    error: null,
+    projects,
+    loading,
+    error,
     filter,
     setFilter,
-    refresh: () => {}, // No longer needed as Dexie handles live updates
+    refresh,
   };
 }
