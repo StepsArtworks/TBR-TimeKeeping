@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login as loginApi, logout as logoutApi, useCurrentUser } from '../lib/api';
+import { login as loginApi, logout as logoutApi } from '../lib/api';
+import { User } from '../types';
+import jwtDecode from 'jwt-decode';
 
 // Base path for the application
 const BASE_PATH = '/tbrtimekeeping';
 
 interface AuthContextType {
-  user: any;
+  user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -22,40 +24,65 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  
-  // Get the user from localStorage initially
-  const [user, setUser] = useState<any>(() => {
-    const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
 
-  // Fetch the current user from the API
-  const { user: currentUser, loading: userLoading, error: userError } = useCurrentUser();
-
+  // Check for token and set user on initial load
   useEffect(() => {
-    if (!userLoading) {
-      if (currentUser) {
-        // Update the user state with the latest data from the API
-        setUser(currentUser);
-        localStorage.setItem('user', JSON.stringify(currentUser));
-      } else if (userError) {
-        // If there's an error fetching the user, clear the stored user
+    const checkAuth = () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
         setUser(null);
-        localStorage.removeItem('user');
-        navigate(`${BASE_PATH}/login`);
+        setLoading(false);
+        return;
       }
+
+      try {
+        // Verify token expiration
+        const decoded: any = jwtDecode(token);
+        const currentTime = Date.now() / 1000;
+        
+        if (decoded.exp && decoded.exp < currentTime) {
+          // Token expired
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // Token is valid, get user from localStorage
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Error decoding token:', error);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        setUser(null);
+      }
+      
       setLoading(false);
-    }
-  }, [currentUser, userLoading, userError, navigate]);
+    };
+
+    checkAuth();
+  }, []);
 
   const handleLogin = async (email: string, password: string) => {
     try {
       setLoading(true);
       const data = await loginApi(email, password);
-      setUser(data.user);
+      
+      // Store token and user in localStorage
+      localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      setUser(data.user);
       setLoading(false);
-      // Use replace: true to prevent going back to login page
+      
+      // Navigate to dashboard
       navigate('/', { replace: true });
     } catch (error) {
       setLoading(false);
@@ -67,19 +94,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       await logoutApi();
-      setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('authToken');
-      setLoading(false);
-      navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
-      // Still clear user state even if API call fails
-      setUser(null);
-      localStorage.removeItem('user');
+    } finally {
+      // Always clear local storage and state
       localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      setUser(null);
       setLoading(false);
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
   };
 

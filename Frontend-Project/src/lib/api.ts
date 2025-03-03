@@ -14,6 +14,20 @@ const handleResponse = async (response: Response) => {
   return response.json();
 };
 
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+};
+
 // Generic fetch hook
 export function useFetch<T>(url: string, dependencies: any[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -30,14 +44,7 @@ export function useFetch<T>(url: string, dependencies: any[] = []) {
         setLoading(true);
         setError(null);
 
-        const token = localStorage.getItem('authToken');
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-        };
-
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+        const headers = getAuthHeaders();
 
         const response = await fetch(`${API_BASE_URL}${url}`, {
           method: 'GET',
@@ -99,13 +106,10 @@ export function useProjectById(id: string) {
 // Create a new project
 export async function createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/projects`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(project),
       credentials: 'include',
     });
@@ -120,13 +124,10 @@ export async function createProject(project: Omit<Project, 'id' | 'created_at' |
 // Update an existing project
 export async function updateProject(id: string, project: Partial<Project>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(project),
       credentials: 'include',
     });
@@ -141,12 +142,10 @@ export async function updateProject(id: string, project: Partial<Project>) {
 // Delete a project
 export async function deleteProject(id: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -185,13 +184,10 @@ export function useTaskById(id: string) {
 // Create a new task
 export async function createTask(task: Omit<Task, 'id'>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/tasks`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(task),
       credentials: 'include',
     });
@@ -206,13 +202,10 @@ export async function createTask(task: Omit<Task, 'id'>) {
 // Update an existing task
 export async function updateTask(id: string, task: Partial<Task>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(task),
       credentials: 'include',
     });
@@ -227,12 +220,10 @@ export async function updateTask(id: string, task: Partial<Task>) {
 // Delete a task
 export async function deleteTask(id: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -280,13 +271,10 @@ export function useTimeEntryById(id: string) {
 // Create a new time entry
 export async function createTimeEntry(entry: Omit<TimeEntry, 'id'>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/time-entries`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(entry),
       credentials: 'include',
     });
@@ -301,13 +289,10 @@ export async function createTimeEntry(entry: Omit<TimeEntry, 'id'>) {
 // Update an existing time entry
 export async function updateTimeEntry(id: string, entry: Partial<TimeEntry>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(entry),
       credentials: 'include',
     });
@@ -322,12 +307,10 @@ export async function updateTimeEntry(id: string, entry: Partial<TimeEntry>) {
 // Delete a time entry
 export async function deleteTimeEntry(id: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/time-entries/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -365,13 +348,10 @@ export function useLeaveRequestById(id: string) {
 // Create a new leave request
 export async function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'approved_by' | 'approved_at'>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/leave-requests`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(request),
       credentials: 'include',
     });
@@ -386,13 +366,10 @@ export async function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'sta
 // Update an existing leave request
 export async function updateLeaveRequest(id: string, request: Partial<LeaveRequest>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/leave-requests/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(request),
       credentials: 'include',
     });
@@ -407,12 +384,10 @@ export async function updateLeaveRequest(id: string, request: Partial<LeaveReque
 // Delete a leave request
 export async function deleteLeaveRequest(id: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/leave-requests/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -464,13 +439,10 @@ export function useLeaveApprovals() {
 // Approve a leave request
 export async function approveRequest(id: string, notes: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/leave-requests/${id}/approve`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({ notes }),
       credentials: 'include',
     });
@@ -485,13 +457,10 @@ export async function approveRequest(id: string, notes: string) {
 // Reject a leave request
 export async function rejectRequest(id: string, notes: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/leave-requests/${id}/reject`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({ notes }),
       credentials: 'include',
     });
@@ -527,27 +496,13 @@ export function useUserById(id: string) {
   };
 }
 
-// Get current user
-export function useCurrentUser() {
-  const { data, loading, error } = useFetch<User>('/users/me');
-  
-  return {
-    user: data,
-    loading,
-    error,
-  };
-}
-
 // Create a new user
 export async function createUser(user: Omit<User, 'id'>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(user),
       credentials: 'include',
     });
@@ -562,13 +517,10 @@ export async function createUser(user: Omit<User, 'id'>) {
 // Update an existing user
 export async function updateUser(id: string, user: Partial<User>) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/users/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(user),
       credentials: 'include',
     });
@@ -583,12 +535,10 @@ export async function updateUser(id: string, user: Partial<User>) {
 // Delete a user
 export async function deleteUser(id: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/users/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -623,13 +573,10 @@ export function useTaskDependencies(taskId: string) {
 // Add a dependency to a task
 export async function addDependency(taskId: string, dependsOnTaskId: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/dependencies`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }),
       credentials: 'include',
     });
@@ -644,12 +591,10 @@ export async function addDependency(taskId: string, dependsOnTaskId: string) {
 // Remove a dependency from a task
 export async function removeDependency(dependencyId: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/task-dependencies/${dependencyId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -789,12 +734,10 @@ export async function login(email: string, password: string) {
 // Logout
 export async function logout() {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     await fetch(`${API_BASE_URL}/logout`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -834,13 +777,10 @@ export async function resetPassword(email: string) {
 // Update password
 export async function updatePassword(password: string) {
   try {
-    const token = localStorage.getItem('authToken');
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/update-password`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({ password }),
       credentials: 'include',
     });
