@@ -3,7 +3,6 @@ import { Clock, Calendar, FileText, DollarSign } from 'lucide-react';
 import { db } from '../../lib/db';
 import { Project, Task, TimeEntry } from '../../types';
 import { cn } from '../../lib/utils';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '../../components/AuthProvider'; // Fixed import path
 
 interface TimeEntryFormProps {
@@ -82,16 +81,16 @@ export function TimeEntryForm({ onSubmit, entry, className }: TimeEntryFormProps
   const calculateHours = (startTime: string, endTime: string): number => {
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
-    
+
     const startMinutes = startHour * 60 + startMinute;
     const endMinutes = endHour * 60 + endMinute;
     let diffMinutes = endMinutes - startMinutes;
-    
+
     // Subtract lunch hour if work spans across lunch time
     if (startHour < 12 && endHour > 13) {
       diffMinutes -= 60; // Subtract 1 hour for lunch
     }
-    
+
     return Math.round((diffMinutes / 60) * 100) / 100; // Round to 2 decimal places
   };
 

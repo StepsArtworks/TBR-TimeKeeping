@@ -5,7 +5,6 @@ import { TaskForm } from '../components/projects/TaskForm';
 import { useAuth } from '../components/AuthProvider';
 import { Task } from '../types';
 import { db } from '../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
 
 export function Tasks() {
   const { user } = useAuth();
@@ -25,7 +24,7 @@ export function Tasks() {
 
       try {
         let query = db.tasks;
-        
+
         if (selectedProject) {
           query = query.where('project_id').equals(selectedProject);
         }
@@ -144,7 +143,7 @@ export function Tasks() {
         </div>
       </div>
 
-      <TaskList 
+      <TaskList
         tasks={tasks || []}
         onTaskUpdate={handleTaskUpdate}
         onEdit={handleTaskEdit}

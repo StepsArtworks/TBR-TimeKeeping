@@ -3,7 +3,6 @@ import { format, isValid } from 'date-fns';
 import { Clock, User, Edit2, AlertCircle } from 'lucide-react';
 import { Task } from '../../types';
 import { db } from '../../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '../../components/AuthProvider';
 
 interface TaskListProps {
@@ -72,10 +71,10 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
 
   const handleAssignUser = async (taskId: string, userId: string) => {
     if (!canEdit) return;
-    
+
     try {
       setLoading(true);
-      await db.tasks.update(taskId, { 
+      await db.tasks.update(taskId, {
         assigned_to: userId || null,
         updated_at: new Date().toISOString()
       });
@@ -145,7 +144,7 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
             {tasks.map((task) => {
               const assignedUser = teamMembers.find(user => user.id === task.assigned_to);
               const { actual, variance, isOvertime } = getHoursVariance(task);
-              
+
               return (
                 <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                   <td className="px-6 py-4">
@@ -222,9 +221,8 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
                       )}
                       <div className="h-1.5 w-full rounded-full bg-gray-200 dark:bg-dark-700">
                         <div
-                          className={`h-1.5 rounded-full ${
-                            isOvertime ? 'bg-red-500' : 'bg-green-500'
-                          }`}
+                          className={`h-1.5 rounded-full ${isOvertime ? 'bg-red-500' : 'bg-green-500'
+                            }`}
                           style={{
                             width: `${Math.min((actual / task.estimated_hours) * 100, 100)}%`
                           }}

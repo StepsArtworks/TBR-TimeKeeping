@@ -1,4 +1,3 @@
-import Dexie, { type Table } from 'dexie';
 import { Project, Task, TimeEntry, LeaveRequest, User, UserInvite } from '../types';
 
 interface TaskDependency {
@@ -20,7 +19,7 @@ export class TBRDatabase extends Dexie {
 
   constructor() {
     super('tbr_timekeeper');
-    
+
     this.version(4).stores({
       projects: '&id, name, status, start_date, end_date',
       tasks: '&id, project_id, name, status, assigned_to, due_date',
@@ -83,9 +82,9 @@ export class TBRDatabase extends Dexie {
     if (projectCount === 0) {
       // Import initial data from mockData
       const { projects, tasks, timeEntries, leaveRequests, users } = await import('./mockData');
-      
-      await this.transaction('rw', 
-        [this.projects, this.tasks, this.timeEntries, this.leaveRequests, this.users], 
+
+      await this.transaction('rw',
+        [this.projects, this.tasks, this.timeEntries, this.leaveRequests, this.users],
         async () => {
           await this.projects.bulkAdd(projects);
           await this.tasks.bulkAdd(tasks);

@@ -3,7 +3,6 @@ import { Plus, Mail, Building, AlertCircle, Edit2, Trash2, Lock } from 'lucide-r
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../lib/db';
 import { User } from '../types';
-import { useLiveQuery } from 'dexie-react-hooks';
 
 interface UserEditForm {
   id: string;
@@ -137,10 +136,10 @@ export function UserManagement() {
       await db.transaction('rw', [db.users, db.timeEntries, db.leaveRequests], async () => {
         // Delete user's time entries
         await db.timeEntries.where('user_id').equals(userId).delete();
-        
+
         // Delete user's leave requests
         await db.leaveRequests.where('user_id').equals(userId).delete();
-        
+
         // Delete user
         await db.users.delete(userId);
       });

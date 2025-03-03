@@ -6,7 +6,6 @@ import { TimeEntriesSummary } from '../components/time-entries/TimeEntriesSummar
 import { useTimeEntries } from '../hooks/useTimeEntries';
 import { db } from '../lib/db';
 import { Project, TimeEntry } from '../types';
-import { useLiveQuery } from 'dexie-react-hooks';
 
 export function TimeEntries() {
   const {

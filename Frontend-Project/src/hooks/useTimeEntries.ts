@@ -3,7 +3,6 @@ import { TimeEntry } from '../types';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
 
 interface TimeEntriesFilter {
   startDate: string;
@@ -27,8 +26,8 @@ export function useTimeEntries() {
         let query = db.timeEntries
           .where('user_id')
           .equals(user.id)
-          .filter(entry => 
-            entry.date >= filter.startDate && 
+          .filter(entry =>
+            entry.date >= filter.startDate &&
             entry.date <= filter.endDate
           );
 
