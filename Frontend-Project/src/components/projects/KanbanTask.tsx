@@ -5,7 +5,7 @@ import { Task } from '../../types';
 import { Clock, AlertCircle } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
 import { db } from '../../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+
 
 interface KanbanTaskProps {
   task: Task;

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { LeaveRequest } from '../types';
 import { db } from '../lib/db';
 import { useAuth } from '../components/AuthProvider';
-import { useLiveQuery } from 'dexie-react-hooks';
+
 
 export function useLeaveRequests() {
   const { user } = useAuth();

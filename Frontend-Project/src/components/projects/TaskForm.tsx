@@ -5,7 +5,7 @@ import { TaskDependencies } from './TaskDependencies';
 import { useTaskDependencies } from '../../hooks/useTaskDependencies';
 import { cn } from '../../lib/utils';
 import { db } from '../../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+
 
 interface TaskFormProps {
   projectId: string;

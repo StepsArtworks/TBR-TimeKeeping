@@ -1,7 +1,7 @@
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, differenceInBusinessDays, isAfter, isBefore, addDays } from 'date-fns';
 import { useAuth } from '../components/AuthProvider';
 import { db } from '../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+
 
 const HOURS_PER_DAY = 8;
 const HOURS_PER_WEEK = 40; // 5 working days * 8 hours
