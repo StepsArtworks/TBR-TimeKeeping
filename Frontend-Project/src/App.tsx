@@ -16,6 +16,9 @@ import { Settings } from './pages/Settings';
 import { UserManagement } from './pages/UserManagement';
 import { useAuth } from './components/AuthProvider';
 
+// Get the base path from the Vite config or default to '/tbrtimekeeping'
+const BASE_PATH = '/tbrtimekeeping';
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
@@ -28,22 +31,22 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to={`${BASE_PATH}/login`} />;
   }
 
   // Redirect admin users to user management
-  if (user.role === 'admin' && window.location.pathname !== '/users') {
-    return <Navigate to="/users" />;
+  if (user.role === 'admin' && window.location.pathname !== `${BASE_PATH}/users`) {
+    return <Navigate to={`${BASE_PATH}/users`} />;
   }
 
   // Prevent non-admin users from accessing user management
-  if (user.role !== 'admin' && window.location.pathname === '/users') {
-    return <Navigate to="/" />;
+  if (user.role !== 'admin' && window.location.pathname === `${BASE_PATH}/users`) {
+    return <Navigate to={`${BASE_PATH}/`} />;
   }
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-dark-900">
-      <Sidebar />
+      <Sidebar basePath={BASE_PATH} />
       <div className="flex-1">
         <Header />
         <main className="mt-16 p-6">{children}</main>
@@ -54,7 +57,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <Router>
+    <Router basename={BASE_PATH}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />

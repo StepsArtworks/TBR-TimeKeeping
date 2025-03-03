@@ -16,6 +16,10 @@ import {
 import { cn } from '../../lib/utils';
 import { useAuth } from '../AuthProvider';
 
+interface SidebarProps {
+  basePath?: string;
+}
+
 const getNavigation = (role: string) => {
   // Admin only sees user management
   if (role === 'admin') {
@@ -37,7 +41,7 @@ const getNavigation = (role: string) => {
   ];
 };
 
-export function Sidebar() {
+export function Sidebar({ basePath = '' }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
   const navigation = getNavigation(user?.role || '');

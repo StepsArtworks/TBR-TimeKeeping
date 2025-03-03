@@ -3,20 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 
-interface LoginResponse {
-  token: string;
-  user: {
-    id: string;
-    email: string;
-    full_name: string;
-    role: string;
-    department: string;
-  };
-}
-
 export function Login() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -37,35 +26,7 @@ export function Login() {
     setError(null);
 
     try {
-      const response = await fetch('https://api.tbrhub.com/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': 'https://api.tbrhub.com'
-        },
-        credentials: 'include', // This is important for handling cookies
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to sign in');
-      }
-
-      const data: LoginResponse = await response.json();
-
-      // Store the JWT token
-      localStorage.setItem('authToken', data.token);
-
-      // Store user data
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Redirect to dashboard
-      navigate('/', { replace: true });
+      await login(formData.email, formData.password);
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
     } finally {
