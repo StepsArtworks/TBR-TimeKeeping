@@ -1,5 +1,0 @@
-id,email,full_name,role,department,vacation_balance,sick_balance,personal_balance,created_at,updated_at
-d7bed21c-5699-4715-89b9-dd1d7654c937,john.manager@example.com,John Manager,management,Management,20,10,5,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
-e3e20f06-4f90-4e22-9e9d-82c9411c7fc5,sarah.lead@example.com,Sarah Lead,lead,Engineering,15,8,3,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
-f4a05c3d-1e7b-4091-a564-2dd9d1d2408f,mike.dev@example.com,Mike Developer,user,Engineering,12,7,2,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
-c2c7b238-459c-4ff5-a5f7-f3e8f8335c5d,lisa.design@example.com,Lisa Designer,user,Design,10,5,2,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
