@@ -57,6 +57,7 @@ module.exports = function (app) {
                     'Access-Control-Allow-Headers': 'Content-Type, Accept',
                     'Access-Control-Allow-Credentials': 'true'
                 });
+                res.set({ 'Custom': 'Hiya from tbr server' })
 
                 return res.status(200).json({
                     token,
