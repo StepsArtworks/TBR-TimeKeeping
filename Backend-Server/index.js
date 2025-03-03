@@ -6,7 +6,9 @@ const express = require('express')
 const bodyParser = require('body-parser');
 const app = express();
 var port = 7777;
-app.use(cors());
+app.use(cors({
+  origin: '*'
+}));
 
 var accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {
   flags: 'a'
