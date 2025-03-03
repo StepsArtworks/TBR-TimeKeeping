@@ -42,7 +42,7 @@ export function Login() {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Origin': 'https://tbrhub.com'
+          'Origin': 'https://api.tbrhub.com'
         },
         credentials: 'include', // This is important for handling cookies
         body: JSON.stringify({
