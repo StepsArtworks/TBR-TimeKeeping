@@ -4,9 +4,9 @@ import { TimeEntriesList } from '../components/time-entries/TimeEntriesList';
 import { TimeEntriesFilter } from '../components/time-entries/TimeEntriesFilter';
 import { TimeEntriesSummary } from '../components/time-entries/TimeEntriesSummary';
 import { useTimeEntries } from '../hooks/useTimeEntries';
-import { db } from '../lib/db';
-import { Project, TimeEntry } from '../types';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useProjects } from '../hooks/useProjects';
+import { TimeEntry } from '../types';
+import { deleteTimeEntry } from '../lib/api';
 
 export function TimeEntries() {
   const {
@@ -15,22 +15,27 @@ export function TimeEntries() {
     error,
     filter,
     setFilter,
-    deleteEntry,
+    refresh,
   } = useTimeEntries();
+  const { projects, loading: projectsLoading } = useProjects();
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
-
-  // Use live query for projects
-  const projects = useLiveQuery(
-    () => db.projects.orderBy('name').toArray(),
-    []
-  );
 
   const handleEdit = (entry: TimeEntry) => {
     setEditingEntry(entry);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  if (!projects) {
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteTimeEntry(id);
+      refresh(); // Refresh the list after deletion
+    } catch (err) {
+      console.error('Error deleting time entry:', err);
+      alert('Failed to delete time entry');
+    }
+  };
+
+  if (projectsLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -59,6 +64,7 @@ export function TimeEntries() {
         <TimeEntryForm
           onSubmit={() => {
             setEditingEntry(null);
+            refresh(); // Refresh the list after adding/editing
           }}
           entry={editingEntry}
         />
@@ -68,7 +74,7 @@ export function TimeEntries() {
         startDate={filter.startDate}
         endDate={filter.endDate}
         projectId={filter.projectId}
-        projects={projects}
+        projects={projects || []}
         onFilterChange={setFilter}
       />
 
@@ -81,7 +87,7 @@ export function TimeEntries() {
           entries={entries}
           loading={loading}
           error={error}
-          onDelete={deleteEntry}
+          onDelete={handleDelete}
           onEdit={handleEdit}
         />
       </div>
