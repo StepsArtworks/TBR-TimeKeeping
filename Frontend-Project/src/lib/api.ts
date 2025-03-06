@@ -103,6 +103,42 @@ export async function deleteTask(id: string): Promise<void> {
   await handleResponse<void>(response);
 }
 
+// Task Dependencies API
+export async function getTaskDependencies(taskId: string): Promise<{
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+}[]> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/dependencies`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function createTaskDependency(data: {
+  task_id: string;
+  depends_on_task_id: string;
+}): Promise<{
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+}> {
+  const response = await fetch(`${API_BASE_URL}/task-dependencies`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteTaskDependency(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/task-dependencies/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  await handleResponse<void>(response);
+}
+
 // Time Entries API
 export async function getTimeEntries(): Promise<TimeEntry[]> {
   const response = await fetch(`${API_BASE_URL}/time-entries`, {
