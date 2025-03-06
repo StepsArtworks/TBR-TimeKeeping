@@ -1,5 +1,0 @@
-id,user_id,leave_type,status,start_date,end_date,hours_per_day,reason,created_at,updated_at
-1,f4a05c3d-1e7b-4091-a564-2dd9d1d2408f,vacation,pending,2024-02-06,2024-02-10,8,Family vacation,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
-2,c2c7b238-459c-4ff5-a5f7-f3e8f8335c5d,sick,approved,2024-01-22,2024-01-23,8,Doctor appointment,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
-3,f4a05c3d-1e7b-4091-a564-2dd9d1d2408f,personal,rejected,2024-01-12,2024-01-12,4,Personal errands,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
-4,c2c7b238-459c-4ff5-a5f7-f3e8f8335c5d,vacation,pending,2024-02-16,2024-02-20,8,Summer holiday,2024-01-27T00:00:00Z,2024-01-27T00:00:00Z
