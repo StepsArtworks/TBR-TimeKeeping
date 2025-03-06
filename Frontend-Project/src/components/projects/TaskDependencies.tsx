@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link2, X } from 'lucide-react';
+import { useTasks } from '../../lib/api';
 
 interface TaskDependency {
   id: string;
@@ -13,19 +14,29 @@ interface TaskDependency {
 
 interface TaskDependenciesProps {
   dependencies: TaskDependency[];
-  availableTasks: { id: string; name: string }[];
+  taskId: string;
+  projectId: string;
   onAdd: (dependsOnTaskId: string) => Promise<void>;
   onRemove: (dependencyId: string) => Promise<void>;
 }
 
 export function TaskDependencies({
   dependencies,
-  availableTasks,
+  taskId,
+  projectId,
   onAdd,
   onRemove,
 }: TaskDependenciesProps) {
   const [adding, setAdding] = React.useState(false);
   const [selectedTaskId, setSelectedTaskId] = React.useState('');
+  const { tasks, loading, error } = useTasks();
+
+  // Filter available tasks to only those in the same project
+  const availableTasks = tasks?.filter(t => 
+    t.project_id === projectId && 
+    t.id !== taskId &&
+    !dependencies.find(d => d.depends_on_task_id === t.id)
+  ) || [];
 
   const handleAdd = async () => {
     if (!selectedTaskId) return;
@@ -37,6 +48,27 @@ export function TaskDependencies({
       console.error('Error adding dependency:', error);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading tasks...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

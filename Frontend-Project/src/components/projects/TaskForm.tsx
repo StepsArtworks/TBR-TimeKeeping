@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Briefcase, FileText, Link2, User as UserIcon } from 'lucide-react';
-import { Project, Task, User } from '../../types';
+import { Project, Task } from '../../types';
 import { TaskDependencies } from './TaskDependencies';
 import { useTaskDependencies } from '../../hooks/useTaskDependencies';
 import { cn } from '../../lib/utils';
-import { db } from '../../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useAuth } from '../AuthProvider';
+import { useUsers, createTask, updateTask } from '../../lib/api';
 
 interface TaskFormProps {
   projectId: string;
@@ -22,25 +22,14 @@ export function TaskForm({
   onCancel,
   className,
 }: TaskFormProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use live query for team members
-  const teamMembers = useLiveQuery(
-    () => db.users.where('role').notEqual('management').toArray(),
-    []
-  );
+  // Get team members from API
+  const { users: teamMembers, loading: teamLoading, error: teamError } = useUsers();
 
-  // Use live query for available tasks
-  const availableTasks = useLiveQuery(
-    () => db.tasks
-      .where('project_id')
-      .equals(projectId)
-      .filter(t => t.id !== task?.id)
-      .toArray(),
-    [projectId, task?.id]
-  );
-
+  // Get task dependencies
   const {
     dependencies,
     loading: dependenciesLoading,
@@ -77,25 +66,20 @@ export function TaskForm({
     setError(null);
 
     try {
-      const taskData = {
-        id: task?.id || crypto.randomUUID(),
+      const taskData: Partial<Task> = {
         project_id: projectId,
         name: formData.name,
         description: formData.description,
         status: formData.status as Task['status'],
-        start_date: task?.start_date || new Date().toISOString(),
         due_date: formData.dueDate,
         estimated_hours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : 0,
-        actual_hours: task?.actual_hours || 0,
         assigned_to: formData.assignedTo || null,
-        created_at: task?.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
 
       if (task) {
-        await db.tasks.update(task.id, taskData);
+        await updateTask(task.id, taskData);
       } else {
-        await db.tasks.add(taskData);
+        await createTask(taskData as Omit<Task, 'id' | 'created_at' | 'updated_at'>);
       }
 
       onSubmit();
@@ -107,7 +91,7 @@ export function TaskForm({
     }
   };
 
-  if (!teamMembers || !availableTasks) {
+  if (teamLoading || dependenciesLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -116,6 +100,14 @@ export function TaskForm({
             Loading...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (teamError || dependenciesError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+        {teamError || dependenciesError}
       </div>
     );
   }
@@ -205,7 +197,7 @@ export function TaskForm({
               className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
             >
               <option value="">Unassigned</option>
-              {teamMembers.map((member) => (
+              {teamMembers?.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.full_name} ({member.department})
                 </option>
@@ -267,7 +259,7 @@ export function TaskForm({
         <div className="rounded-lg border border-gray-200 p-4 dark:border-dark-700">
           <TaskDependencies
             dependencies={dependencies}
-            availableTasks={availableTasks}
+            availableTasks={[]}
             onAdd={addDependency}
             onRemove={removeDependency}
           />

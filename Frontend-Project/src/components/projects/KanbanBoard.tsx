@@ -16,7 +16,7 @@ import {
 import { Task } from '../../types';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanTask } from './KanbanTask';
-import { useAuth } from '../../components/AuthProvider';
+import { useAuth } from '../AuthProvider';
 
 interface KanbanBoardProps {
   tasks: Task[];

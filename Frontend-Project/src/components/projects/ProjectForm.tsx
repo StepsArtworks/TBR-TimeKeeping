@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Calendar, DollarSign, X } from 'lucide-react';
 import { Project } from '../../types';
 import { useAuth } from '../AuthProvider';
-import { db } from '../../lib/db';
+import { createProject, updateProject } from '../../lib/api';
 
 interface ProjectFormProps {
   project?: Project;
@@ -42,26 +42,21 @@ export function ProjectForm({
         throw new Error('Insufficient permissions');
       }
 
-      const projectData: Project = {
-        id: project?.id || crypto.randomUUID(),
+      const projectData: Partial<Project> = {
         name: formData.name,
         description: formData.description,
         start_date: formData.startDate,
         end_date: formData.endDate || null,
         budget: formData.budget ? parseFloat(formData.budget) : 0,
-        budget_spent: project?.budget_spent || 0,
         status: formData.status as Project['status'],
-        created_by: project?.created_by || user.id,
-        created_at: project?.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
 
       if (project) {
         // Update existing project
-        await db.projects.update(project.id, projectData);
+        await updateProject(project.id, projectData);
       } else {
         // Add new project
-        await db.projects.add(projectData);
+        await createProject(projectData as Omit<Project, 'id' | 'created_at' | 'updated_at'>);
       }
 
       onSubmit();

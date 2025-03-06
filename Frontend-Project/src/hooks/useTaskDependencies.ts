@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { db } from '../lib/db';
 import { Task } from '../types';
+import { getTasks, createTaskDependency, deleteTaskDependency } from '../lib/api';
 
 interface TaskDependency {
   id: string;
@@ -17,95 +17,47 @@ export function useTaskDependencies(taskId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetchDependencies();
+  }, [taskId]);
+
   const fetchDependencies = async () => {
     if (!taskId) return;
 
     try {
       setLoading(true);
-      setError(null);
+      const [deps, tasks] = await Promise.all([
+        getTaskDependencies(taskId),
+        getTasks()
+      ]);
 
-      // Get all task dependencies for this task
-      const deps = await db.taskDependencies
-        .where('task_id')
-        .equals(taskId)
-        .toArray();
-
-      // Get the dependent tasks details
-      const dependentTasks = await db.tasks
-        .where('id')
-        .anyOf(deps.map(d => d.depends_on_task_id))
-        .toArray();
-
-      // Combine the data
+      // Combine dependency and task data
       const dependenciesWithTasks = deps.map(dep => ({
-        id: dep.id,
-        task_id: dep.task_id,
-        depends_on_task_id: dep.depends_on_task_id,
+        ...dep,
         depends_on_task: {
-          name: dependentTasks.find(t => t.id === dep.depends_on_task_id)?.name || 'Unknown Task',
-          status: dependentTasks.find(t => t.id === dep.depends_on_task_id)?.status || 'unknown'
+          name: tasks.find(t => t.id === dep.depends_on_task_id)?.name || 'Unknown Task',
+          status: tasks.find(t => t.id === dep.depends_on_task_id)?.status || 'unknown'
         }
       }));
 
       setDependencies(dependenciesWithTasks);
+      setError(null);
     } catch (err) {
       console.error('Error loading task dependencies:', err);
       setError('Failed to load task dependencies');
+      setDependencies([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchDependencies();
-  }, [taskId]);
-
   const addDependency = async (dependsOnTaskId: string) => {
     try {
-      // Check if dependency already exists
-      const existing = await db.taskDependencies
-        .where(['task_id', 'depends_on_task_id'])
-        .equals([taskId, dependsOnTaskId])
-        .first();
-
-      if (existing) {
-        throw new Error('Dependency already exists');
-      }
-
-      // Check for circular dependencies
-      const checkCircular = async (currentTaskId: string, path = new Set<string>()): Promise<boolean> => {
-        if (path.has(currentTaskId)) return true;
-        path.add(currentTaskId);
-
-        const deps = await db.taskDependencies
-          .where('task_id')
-          .equals(currentTaskId)
-          .toArray();
-
-        for (const dep of deps) {
-          if (await checkCircular(dep.depends_on_task_id, new Set(path))) {
-            return true;
-          }
-        }
-
-        return false;
-      };
-
-      // Check if adding this dependency would create a circular reference
-      if (await checkCircular(dependsOnTaskId, new Set([taskId]))) {
-        throw new Error('Cannot add dependency: would create circular reference');
-      }
-
-      // Add the new dependency
-      await db.taskDependencies.add({
-        id: crypto.randomUUID(),
+      const newDependency = await createTaskDependency({
         task_id: taskId,
-        depends_on_task_id: dependsOnTaskId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        depends_on_task_id: dependsOnTaskId
       });
-
-      await fetchDependencies();
+      await fetchDependencies(); // Refresh dependencies
     } catch (err) {
       console.error('Error adding dependency:', err);
       throw err;
@@ -114,8 +66,8 @@ export function useTaskDependencies(taskId: string) {
 
   const removeDependency = async (dependencyId: string) => {
     try {
-      await db.taskDependencies.delete(dependencyId);
-      await fetchDependencies();
+      await deleteTaskDependency(dependencyId);
+      await fetchDependencies(); // Refresh dependencies
     } catch (err) {
       console.error('Error removing dependency:', err);
       throw err;

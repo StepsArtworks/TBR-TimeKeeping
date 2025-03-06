@@ -3,6 +3,7 @@ import { PieChart, Clock } from 'lucide-react';
 import { TimeEntry } from '../../types';
 import { formatHours, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../AuthProvider';
+import { useProjects } from '../../lib/api';
 
 interface TimeEntriesSummaryProps {
   entries: TimeEntry[];
@@ -10,13 +11,16 @@ interface TimeEntriesSummaryProps {
 
 export function TimeEntriesSummary({ entries }: TimeEntriesSummaryProps) {
   const { user } = useAuth();
-  const isLead = user?.role === 'lead' || user?.role === 'management';
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+  const isLeadOrManagement = user?.role === 'lead' || user?.role === 'management';
 
   // For normal users, only show their entries
-  const relevantEntries = isLead ? entries : entries.filter(entry => entry.user_id === user?.id);
+  const relevantEntries = isLeadOrManagement ? entries : entries.filter(entry => entry.user_id === user?.id);
 
   const projectSummary = relevantEntries.reduce((acc, entry) => {
-    const projectName = entry.project?.name || 'Unknown Project';
+    const project = projects?.find(p => p.id === entry.project_id);
+    const projectName = project?.name || 'Unknown Project';
+    
     acc[projectName] = {
       total: (acc[projectName]?.total || 0) + entry.hours,
       billable: (acc[projectName]?.billable || 0) + (entry.is_billable ? entry.hours : 0),
@@ -37,7 +41,28 @@ export function TimeEntriesSummary({ entries }: TimeEntriesSummaryProps) {
     0
   );
 
-  if (!isLead) {
+  if (projectsLoading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading time summary...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (projectsError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{projectsError}</p>
+      </div>
+    );
+  }
+
+  if (!isLeadOrManagement) {
     // Simplified view for normal users
     return (
       <div className="rounded-lg bg-white p-6 shadow-sm dark:bg-dark-800">

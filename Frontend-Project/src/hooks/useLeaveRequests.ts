@@ -1,114 +1,60 @@
 import { useState, useEffect } from 'react';
 import { LeaveRequest } from '../types';
-import { db } from '../lib/db';
 import { useAuth } from '../components/AuthProvider';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getLeaveRequests, createLeaveRequest, updateLeaveRequest, deleteLeaveRequest } from '../lib/api';
 
 export function useLeaveRequests() {
   const { user } = useAuth();
-  const isLead = user?.role === 'lead';
-  const isManagement = user?.role === 'management';
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [balances, setBalances] = useState({
+    vacation: 0,
+    sick: 0,
+    personal: 0,
+  });
 
-  // Use live query for leave requests
-  const requests = useLiveQuery(
-    async () => {
-      if (!user) return [];
+  useEffect(() => {
+    fetchRequests();
+  }, [user]);
 
-      try {
-        let query = db.leaveRequests;
+  const fetchRequests = async () => {
+    if (!user) return;
 
-        // For leads, get department requests
-        if (isLead) {
-          const departmentUsers = await db.users
-            .where('department')
-            .equals(user.department)
-            .toArray();
-          
-          const departmentUserIds = departmentUsers.map(u => u.id);
-          query = query.where('user_id').anyOf(departmentUserIds);
-        }
-        // For normal users, get only their requests
-        else if (!isManagement) {
-          query = query.where('user_id').equals(user.id);
-        }
+    try {
+      setLoading(true);
+      const data = await getLeaveRequests();
+      setRequests(data);
+      setError(null);
 
-        const requests = await query.toArray();
-
-        // Get user details for each request
-        const userIds = [...new Set(requests.map(r => r.user_id))];
-        const users = await db.users
-          .where('id')
-          .anyOf(userIds)
-          .toArray();
-
-        // Combine request and user data
-        return requests.map(request => ({
-          ...request,
-          user: users.find(u => u.id === request.user_id),
-        }));
-      } catch (err) {
-        console.error('Error loading leave requests:', err);
-        return [];
-      }
-    },
-    [user]
-  );
-
-  // Get user's leave balances
-  const balances = useLiveQuery(
-    async () => {
-      if (!user) return null;
-
-      try {
-        const userDetails = await db.users.get(user.id);
-        return userDetails ? {
-          vacation: userDetails.vacation_balance,
-          sick: userDetails.sick_balance,
-          personal: userDetails.personal_balance,
-        } : null;
-      } catch (err) {
-        console.error('Error loading leave balances:', err);
-        return null;
-      }
-    },
-    [user]
-  );
+      // Update balances from user data
+      setBalances({
+        vacation: user.vacation_balance,
+        sick: user.sick_balance,
+        personal: user.personal_balance,
+      });
+    } catch (err) {
+      console.error('Error loading leave requests:', err);
+      setError('Failed to load leave requests');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const createRequest = async (data: any) => {
     try {
-      if (!user) throw new Error('Not authenticated');
-
-      // Calculate total days
-      const start = new Date(data.startDate);
-      const end = new Date(data.endDate);
-      const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      const totalHours = totalDays * data.hoursPerDay;
-
-      // Check leave balance
-      const userDetails = await db.users.get(user.id);
-      if (!userDetails) throw new Error('User not found');
-
-      const balanceField = `${data.leaveType}_balance` as keyof typeof userDetails;
-      const currentBalance = userDetails[balanceField] as number;
-      
-      if (totalDays > currentBalance) {
-        throw new Error(`Insufficient ${data.leaveType} leave balance`);
-      }
-
-      const newRequest: LeaveRequest = {
-        id: crypto.randomUUID(),
-        user_id: user.id,
+      const newRequest = await createLeaveRequest({
+        user_id: user!.id,
         leave_type: data.leaveType,
         start_date: data.startDate,
         end_date: data.endDate,
         hours_per_day: parseFloat(data.hoursPerDay),
         reason: data.reason,
         status: 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      });
 
-      await db.leaveRequests.add(newRequest);
+      setRequests(prev => [...prev, newRequest]);
+      return newRequest;
     } catch (err) {
       console.error('Error creating leave request:', err);
       throw err;
@@ -117,41 +63,20 @@ export function useLeaveRequests() {
 
   const updateRequest = async (id: string, data: any) => {
     try {
-      if (!user) throw new Error('Not authenticated');
-
-      const request = await db.leaveRequests.get(id);
-      if (!request) throw new Error('Request not found');
-
-      // Only allow updates to pending requests
-      if (request.status !== 'pending') {
-        throw new Error('Cannot update processed requests');
-      }
-
-      // Calculate total days for new dates
-      const start = new Date(data.startDate);
-      const end = new Date(data.endDate);
-      const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      const totalHours = totalDays * data.hoursPerDay;
-
-      // Check leave balance
-      const userDetails = await db.users.get(user.id);
-      if (!userDetails) throw new Error('User not found');
-
-      const balanceField = `${data.leaveType}_balance` as keyof typeof userDetails;
-      const currentBalance = userDetails[balanceField] as number;
-      
-      if (totalDays > currentBalance) {
-        throw new Error(`Insufficient ${data.leaveType} leave balance`);
-      }
-
-      await db.leaveRequests.update(id, {
+      const updatedRequest = await updateLeaveRequest(id, {
         leave_type: data.leaveType,
         start_date: data.startDate,
         end_date: data.endDate,
         hours_per_day: parseFloat(data.hoursPerDay),
         reason: data.reason,
-        updated_at: new Date().toISOString(),
       });
+
+      setRequests(prev =>
+        prev.map(request =>
+          request.id === id ? updatedRequest : request
+        )
+      );
+      return updatedRequest;
     } catch (err) {
       console.error('Error updating leave request:', err);
       throw err;
@@ -160,15 +85,8 @@ export function useLeaveRequests() {
 
   const deleteRequest = async (id: string) => {
     try {
-      const request = await db.leaveRequests.get(id);
-      if (!request) throw new Error('Request not found');
-
-      // Only allow deletion of pending requests
-      if (request.status !== 'pending') {
-        throw new Error('Cannot delete processed requests');
-      }
-
-      await db.leaveRequests.delete(id);
+      await deleteLeaveRequest(id);
+      setRequests(prev => prev.filter(request => request.id !== id));
     } catch (err) {
       console.error('Error deleting leave request:', err);
       throw err;
@@ -176,10 +94,10 @@ export function useLeaveRequests() {
   };
 
   return {
-    requests: requests || [],
-    loading: !requests,
-    error: null,
-    balances: balances || { vacation: 0, sick: 0, personal: 0 },
+    requests,
+    loading,
+    error,
+    balances,
     createRequest,
     updateRequest,
     deleteRequest,

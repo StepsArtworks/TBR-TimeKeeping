@@ -2,12 +2,12 @@ import React from 'react';
 import { Calendar, Filter } from 'lucide-react';
 import { Project } from '../../types';
 import { cn } from '../../lib/utils';
+import { useProjects } from '../../lib/api';
 
 interface TimeEntriesFilterProps {
   startDate: string;
   endDate: string;
   projectId?: string;
-  projects: Project[];
   onFilterChange: (filter: {
     startDate: string;
     endDate: string;
@@ -20,10 +20,38 @@ export function TimeEntriesFilter({
   startDate,
   endDate,
   projectId,
-  projects,
   onFilterChange,
   className,
 }: TimeEntriesFilterProps) {
+  const { projects, loading, error } = useProjects();
+
+  if (loading) {
+    return (
+      <div className={cn(
+        'flex items-center justify-center rounded-lg bg-white p-4 shadow-sm dark:bg-dark-800',
+        className
+      )}>
+        <div className="text-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading filters...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={cn(
+        'rounded-lg bg-red-50 p-4 dark:bg-red-900/20',
+        className
+      )}>
+        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -76,7 +104,7 @@ export function TimeEntriesFilter({
           className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
         >
           <option value="">All Projects</option>
-          {projects.map((project) => (
+          {projects?.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
             </option>

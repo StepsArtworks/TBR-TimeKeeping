@@ -4,8 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Task } from '../../types';
 import { Clock, AlertCircle } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
-import { db } from '../../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useUserById } from '../../lib/api';
 
 interface KanbanTaskProps {
   task: Task;
@@ -30,11 +29,8 @@ export function KanbanTask({ task, canEdit }: KanbanTaskProps) {
     transition,
   };
 
-  // Use live query to get assigned user
-  const assignedUser = useLiveQuery(
-    () => db.users.get(task.assigned_to),
-    [task.assigned_to]
-  );
+  // Get assigned user from API
+  const { user: assignedUser, loading, error } = useUserById(task.assigned_to);
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date();
 
@@ -70,7 +66,7 @@ export function KanbanTask({ task, canEdit }: KanbanTaskProps) {
         </div>
       )}
 
-      {assignedUser && (
+      {assignedUser && !loading && !error && (
         <div className="mt-3 flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium dark:bg-dark-700">
             {assignedUser.full_name[0]}

@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Clock, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import { TimeEntry } from '../../types';
 import { formatHours } from '../../lib/utils';
+import { useProjects, useTasks } from '../../lib/api';
 
 interface TimeEntriesListProps {
   entries: TimeEntry[];
@@ -20,6 +21,10 @@ export function TimeEntriesList({
   onEdit,
 }: TimeEntriesListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Get projects and tasks for entry details
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+  const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this time entry?')) return;
@@ -28,7 +33,7 @@ export function TimeEntriesList({
     setDeletingId(null);
   };
 
-  if (loading) {
+  if (loading || projectsLoading || tasksLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -41,7 +46,7 @@ export function TimeEntriesList({
     );
   }
 
-  if (error) {
+  if (error || projectsError || tasksError) {
     return (
       <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
         <div className="flex">
@@ -51,7 +56,7 @@ export function TimeEntriesList({
               Error
             </h3>
             <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-              {error}
+              {error || projectsError || tasksError}
             </div>
           </div>
         </div>
@@ -99,49 +104,54 @@ export function TimeEntriesList({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
-          {entries.map((entry) => (
-            <tr
-              key={entry.id}
-              className="group hover:bg-gray-50 dark:hover:bg-dark-700"
-            >
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                {format(new Date(entry.date), 'MMM d, yyyy')}
-              </td>
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                {entry.project?.name}
-              </td>
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                {entry.task?.name || '-'}
-              </td>
-              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                {formatHours(entry.hours)}
-              </td>
-              <td className="max-w-md px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                <p className="truncate">{entry.description}</p>
-              </td>
-              <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                <div className="flex justify-end space-x-2">
-                  <button
-                    onClick={() => onEdit(entry)}
-                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-dark-600"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(entry.id)}
-                    disabled={deletingId === entry.id}
-                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-dark-600"
-                  >
-                    {deletingId === entry.id ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {entries.map((entry) => {
+            const project = projects?.find(p => p.id === entry.project_id);
+            const task = tasks?.find(t => t.id === entry.task_id);
+
+            return (
+              <tr
+                key={entry.id}
+                className="group hover:bg-gray-50 dark:hover:bg-dark-700"
+              >
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                  {format(new Date(entry.date), 'MMM d, yyyy')}
+                </td>
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                  {project?.name}
+                </td>
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                  {task?.name || '-'}
+                </td>
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                  {formatHours(entry.hours)}
+                </td>
+                <td className="max-w-md px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                  <p className="truncate">{entry.description}</p>
+                </td>
+                <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={() => onEdit(entry)}
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-dark-600"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(entry.id)}
+                      disabled={deletingId === entry.id}
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-dark-600"
+                    >
+                      {deletingId === entry.id ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

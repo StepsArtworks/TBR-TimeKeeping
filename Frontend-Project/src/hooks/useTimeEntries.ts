@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { TimeEntry } from '../types';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { TimeEntry, Project } from '../types';
 import { useAuth } from '../components/AuthProvider';
-import { db } from '../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getTimeEntries, getProjects, createTimeEntry, updateTimeEntry, deleteTimeEntry } from '../lib/api';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
 interface TimeEntriesFilter {
   startDate: string;
@@ -13,58 +12,106 @@ interface TimeEntriesFilter {
 
 export function useTimeEntries() {
   const { user } = useAuth();
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<TimeEntriesFilter>({
     startDate: startOfMonth(new Date()).toISOString().split('T')[0],
     endDate: endOfMonth(new Date()).toISOString().split('T')[0],
   });
 
-  // Use live query for time entries with filtering
-  const entries = useLiveQuery(
-    async () => {
-      if (!user) return [];
+  useEffect(() => {
+    fetchData();
+  }, [user, filter]);
 
-      try {
-        let query = db.timeEntries
-          .where('user_id')
-          .equals(user.id)
-          .filter(entry => 
-            entry.date >= filter.startDate && 
-            entry.date <= filter.endDate
-          );
+  const fetchData = async () => {
+    if (!user) return;
 
-        if (filter.projectId) {
-          query = query.filter(entry => entry.project_id === filter.projectId);
-        }
+    try {
+      setLoading(true);
+      const [entriesData, projectsData] = await Promise.all([
+        getTimeEntries(),
+        getProjects()
+      ]);
 
-        const entries = await query.toArray();
+      // Filter entries based on date range and project
+      let filteredEntries = entriesData.filter(entry => 
+        entry.date >= filter.startDate && 
+        entry.date <= filter.endDate
+      );
 
-        // Get projects and tasks for the entries
-        const projectIds = new Set(entries.map(e => e.project_id));
-        const taskIds = new Set(entries.map(e => e.task_id).filter(Boolean));
-
-        const [projects, tasks] = await Promise.all([
-          db.projects.where('id').anyOf([...projectIds]).toArray(),
-          db.tasks.where('id').anyOf([...taskIds]).toArray()
-        ]);
-
-        // Enrich entries with project and task data
-        return entries.map(entry => ({
-          ...entry,
-          project: projects.find(p => p.id === entry.project_id),
-          task: tasks.find(t => t.id === entry.task_id)
-        })).sort((a, b) => b.date.localeCompare(a.date));
-
-      } catch (err) {
-        console.error('Error loading time entries:', err);
-        return [];
+      if (filter.projectId) {
+        filteredEntries = filteredEntries.filter(entry => 
+          entry.project_id === filter.projectId
+        );
       }
-    },
-    [filter, user]
-  );
+
+      // Sort entries by date (newest first)
+      filteredEntries.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setEntries(filteredEntries);
+      setProjects(projectsData);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading time entries:', err);
+      setError('Failed to load time entries');
+      setEntries([]);
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createEntry = async (data: any) => {
+    try {
+      const newEntry = await createTimeEntry({
+        user_id: user!.id,
+        project_id: data.projectId,
+        task_id: data.taskId,
+        date: data.date,
+        hours: data.hours,
+        description: data.description,
+        is_billable: data.isBillable,
+      });
+
+      setEntries(prev => [newEntry, ...prev]);
+      return newEntry;
+    } catch (err) {
+      console.error('Error creating time entry:', err);
+      throw err;
+    }
+  };
+
+  const updateEntry = async (id: string, data: any) => {
+    try {
+      const updatedEntry = await updateTimeEntry(id, {
+        project_id: data.projectId,
+        task_id: data.taskId,
+        date: data.date,
+        hours: data.hours,
+        description: data.description,
+        is_billable: data.isBillable,
+      });
+
+      setEntries(prev =>
+        prev.map(entry =>
+          entry.id === id ? updatedEntry : entry
+        )
+      );
+      return updatedEntry;
+    } catch (err) {
+      console.error('Error updating time entry:', err);
+      throw err;
+    }
+  };
 
   const deleteEntry = async (id: string) => {
     try {
-      await db.timeEntries.delete(id);
+      await deleteTimeEntry(id);
+      setEntries(prev => prev.filter(entry => entry.id !== id));
     } catch (err) {
       console.error('Error deleting time entry:', err);
       throw err;
@@ -72,11 +119,14 @@ export function useTimeEntries() {
   };
 
   return {
-    entries: entries || [],
-    loading: !entries,
-    error: null,
+    entries,
+    projects,
+    loading,
+    error,
     filter,
     setFilter,
+    createEntry,
+    updateEntry,
     deleteEntry,
   };
 }

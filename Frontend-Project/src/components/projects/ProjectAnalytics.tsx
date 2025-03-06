@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { Clock, TrendingUp, Users } from 'lucide-react';
 import { formatCurrency, formatHours } from '../../lib/utils';
+import { useAuth } from '../AuthProvider';
 
 interface ProjectMetrics {
   total_hours: number;
@@ -34,13 +35,41 @@ interface ProjectAnalyticsProps {
     completed: number;
     inProgress: number;
   }[];
+  loading?: boolean;
+  error?: string | null;
 }
 
 export function ProjectAnalytics({
   metrics,
   timeData,
   taskData,
+  loading,
+  error,
 }: ProjectAnalyticsProps) {
+  const { user } = useAuth();
+  const isLeadOrManagement = user?.role === 'lead' || user?.role === 'management';
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading project analytics...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { format, isValid } from 'date-fns';
 import { Clock, User, Edit2, AlertCircle } from 'lucide-react';
 import { Task } from '../../types';
-import { db } from '../../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { useAuth } from '../../components/AuthProvider';
+import { useAuth } from '../AuthProvider';
+import { useUsers, useTasks, useTimeEntries } from '../../lib/api';
 
 interface TaskListProps {
   tasks: Task[];
@@ -15,29 +14,30 @@ interface TaskListProps {
 export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [taskHours, setTaskHours] = useState<Record<string, number>>({});
 
   // Check if user has edit permissions (lead or management)
   const canEdit = user?.role === 'lead' || user?.role === 'management';
 
-  // Use live query for team members
-  const teamMembers = useLiveQuery(
-    () => db.users.filter(user => user.role !== 'management').toArray(),
-    []
-  );
+  // Get team members from API
+  const { users: teamMembers, loading: teamLoading, error: teamError } = useUsers();
 
-  // Use live query for time entries
-  const timeEntries = useLiveQuery(
-    () => db.timeEntries.toArray(),
-    []
-  );
+  // Get time entries from API
+  const { entries: timeEntries, loading: entriesLoading, error: entriesError } = useTimeEntries();
 
-  // Calculate actual hours for each task
-  const taskHours = timeEntries?.reduce((acc, entry) => {
-    if (entry.task_id) {
-      acc[entry.task_id] = (acc[entry.task_id] || 0) + entry.hours;
-    }
-    return acc;
-  }, {} as Record<string, number>) || {};
+  // Calculate task hours
+  React.useEffect(() => {
+    if (!timeEntries) return;
+    
+    const hours = timeEntries.reduce((acc, entry) => {
+      if (entry.task_id) {
+        acc[entry.task_id] = (acc[entry.task_id] || 0) + entry.hours;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+    
+    setTaskHours(hours);
+  }, [timeEntries]);
 
   const getHoursVariance = (task: Task) => {
     const actualHours = taskHours[task.id] || 0;
@@ -72,13 +72,10 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
 
   const handleAssignUser = async (taskId: string, userId: string) => {
     if (!canEdit) return;
-    
+
     try {
       setLoading(true);
-      await db.tasks.update(taskId, { 
-        assigned_to: userId || null,
-        updated_at: new Date().toISOString()
-      });
+      await onTaskUpdate(taskId, tasks.find(t => t.id === taskId)?.status || 'not_started');
     } catch (err) {
       console.error('Error assigning user:', err);
     } finally {
@@ -86,7 +83,7 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
     }
   };
 
-  if (!teamMembers || !timeEntries) {
+  if (teamLoading || entriesLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -94,6 +91,24 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Loading data...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (teamError || entriesError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <div className="flex">
+          <AlertCircle className="h-5 w-5 text-red-400" />
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+              Error
+            </h3>
+            <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+              {teamError || entriesError}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -143,7 +158,7 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
             {tasks.map((task) => {
-              const assignedUser = teamMembers.find(user => user.id === task.assigned_to);
+              const assignedUser = teamMembers?.find(user => user.id === task.assigned_to);
               const { actual, variance, isOvertime } = getHoursVariance(task);
               
               return (
@@ -169,7 +184,7 @@ export function TaskList({ tasks, onTaskUpdate, onEdit }: TaskListProps) {
                           className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
                         >
                           <option value="">Unassigned</option>
-                          {teamMembers.map((user) => (
+                          {teamMembers?.map((user) => (
                             <option key={user.id} value={user.id}>
                               {user.full_name} ({user.department})
                             </option>
