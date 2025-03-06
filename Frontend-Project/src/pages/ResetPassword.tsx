@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { resetPassword } from '../lib/api';
 
 export function ResetPassword() {
   const [loading, setLoading] = useState(false);
@@ -13,11 +13,7 @@ export function ResetPassword() {
     setMessage(null);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
-      });
-
-      if (error) throw error;
+      await resetPassword(email);
       
       setMessage({
         type: 'success',

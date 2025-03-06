@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Calendar, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { timeEntries, projects } from '../lib/mockData';
+import { useTimeEntries } from '../hooks/useTimeEntries';
+import { useProjects } from '../hooks/useProjects';
 import { useAuth } from '../components/AuthProvider';
 import { formatHours } from '../lib/utils';
 
@@ -14,14 +15,30 @@ export function Reports() {
     new Date().toISOString().split('T')[0]
   );
 
+  const { entries, loading: entriesLoading } = useTimeEntries();
+  const { projects, loading: projectsLoading } = useProjects();
+
+  if (entriesLoading || projectsLoading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Loading report data...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Calculate report data
-  const reportData = projects.map(project => {
-    const projectEntries = timeEntries.filter(
+  const reportData = projects?.map(project => {
+    const projectEntries = entries?.filter(
       entry => 
         entry.project_id === project.id &&
         entry.date >= startDate &&
         entry.date <= endDate
-    );
+    ) || [];
 
     const totalHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
     const billableHours = projectEntries
@@ -33,7 +50,7 @@ export function Reports() {
       totalHours,
       billableHours,
     };
-  });
+  }) || [];
 
   return (
     <div className="space-y-6">

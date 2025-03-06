@@ -421,3 +421,16 @@ export function useTasks() {
 
   return { tasks, loading, error };
 }
+
+// Add this to the existing api.ts file, after the other API functions
+
+export async function resetPassword(email: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+  await handleResponse<void>(response);
+}

@@ -11,7 +11,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Project, Task, User } from '../types';
+import { Project, Task } from '../types';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import { TaskList } from '../components/projects/TaskList';
 import { KanbanBoard } from '../components/projects/KanbanBoard';
@@ -19,11 +19,13 @@ import { TeamManagement } from '../components/projects/TeamManagement';
 import { ProjectAnalytics } from '../components/projects/ProjectAnalytics';
 import { useProjectAnalytics } from '../hooks/useProjectAnalytics';
 import { formatCurrency } from '../lib/utils';
-import { db } from '../lib/db';
+import { useAuth } from '../components/AuthProvider';
+import { getProject, getTasks, getUsers, updateTask } from '../lib/api';
 
 export function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [projectTasks, setProjectTasks] = useState<Task[]>([]);
   const [team, setTeam] = useState<User[]>([]);
@@ -46,28 +48,21 @@ export function ProjectDetails() {
         setLoading(true);
         setError(null);
 
-        // Load project from IndexedDB
-        const project = await db.projects.get(id);
-        if (!project) {
-          throw new Error('Project not found');
-        }
-        setProject(project);
+        // Load project details
+        const projectData = await getProject(id);
+        setProject(projectData);
 
         // Load project tasks
-        const tasks = await db.tasks
-          .where('project_id')
-          .equals(id)
-          .toArray();
-        setProjectTasks(tasks);
+        const tasksData = await getTasks();
+        const projectTasks = tasksData.filter(task => task.project_id === id);
+        setProjectTasks(projectTasks);
 
         // Get unique assigned user IDs
-        const assignedUserIds = new Set(tasks.map(t => t.assigned_to).filter(Boolean));
+        const assignedUserIds = new Set(projectTasks.map(t => t.assigned_to).filter(Boolean));
 
         // Load team members
-        const teamMembers = await db.users
-          .where('id')
-          .anyOf([...assignedUserIds])
-          .toArray();
+        const users = await getUsers();
+        const teamMembers = users.filter(user => assignedUserIds.has(user.id));
         setTeam(teamMembers);
 
       } catch (err) {
@@ -85,10 +80,7 @@ export function ProjectDetails() {
 
   const handleTaskUpdate = async (taskId: string, newStatus: Task['status']) => {
     try {
-      await db.tasks.update(taskId, {
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      });
+      await updateTask(taskId, { status: newStatus });
       
       // Update local state
       setProjectTasks(tasks => 
@@ -105,7 +97,8 @@ export function ProjectDetails() {
 
   const handleAssignTeamMember = async (userId: string) => {
     try {
-      const user = await db.users.get(userId);
+      const users = await getUsers();
+      const user = users.find(u => u.id === userId);
       if (user && !team.find(t => t.id === userId)) {
         setTeam([...team, user]);
       }
@@ -121,10 +114,7 @@ export function ProjectDetails() {
       // Update tasks assigned to this user
       const userTasks = projectTasks.filter(t => t.assigned_to === userId);
       for (const task of userTasks) {
-        await db.tasks.update(task.id, {
-          assigned_to: null,
-          updated_at: new Date().toISOString()
-        });
+        await updateTask(task.id, { assigned_to: null });
       }
       
       // Update local state
