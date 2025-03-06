@@ -4,7 +4,8 @@ import { TaskList } from '../components/projects/TaskList';
 import { TaskForm } from '../components/projects/TaskForm';
 import { useAuth } from '../components/AuthProvider';
 import { Task } from '../types';
-import { useTasks, useProjects } from '../lib/api';
+import { useTasks } from '../lib/api';
+import { useProjects } from '../hooks/useProjects';
 import { updateTask } from '../lib/api';
 
 export function Tasks() {
@@ -138,7 +139,7 @@ export function Tasks() {
         </div>
       </div>
 
-      <TaskList 
+      <TaskList
         tasks={filteredTasks || []}
         onTaskUpdate={handleTaskUpdate}
         onEdit={handleTaskEdit}
