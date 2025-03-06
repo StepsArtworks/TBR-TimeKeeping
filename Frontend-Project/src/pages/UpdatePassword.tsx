@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { updatePassword } from '../lib/api';
+import { useAuth } from '../components/AuthProvider';
 
 export function UpdatePassword() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
@@ -22,11 +24,9 @@ export function UpdatePassword() {
     }
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
-      });
+      if (!user) throw new Error('Not authenticated');
 
-      if (updateError) throw updateError;
+      await updatePassword(user.id, password);
       navigate('/login');
     } catch (err: any) {
       setError(err.message || 'Failed to update password');
