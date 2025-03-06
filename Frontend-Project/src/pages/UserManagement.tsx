@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Plus, Mail, Building, AlertCircle, Edit2, Trash2, Lock } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
-import { db } from '../lib/db';
+import { useUsers } from '../lib/api';
 import { User } from '../types';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { createUser, updateUser, deleteUser } from '../lib/api';
 
 interface UserEditForm {
   id: string;
@@ -16,9 +16,10 @@ interface UserEditForm {
 
 export function UserManagement() {
   const { user } = useAuth();
+  const { users, loading, error, refresh } = useUsers();
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<UserEditForm>({
     id: '',
     email: '',
@@ -27,12 +28,6 @@ export function UserManagement() {
     role: 'user',
     department: '',
   });
-
-  // Use live query for users
-  const users = useLiveQuery(
-    () => db.users.toArray(),
-    []
-  );
 
   // Only allow access to admin users
   if (user?.role !== 'admin') {
@@ -50,54 +45,27 @@ export function UserManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    setFormLoading(true);
+    setFormError(null);
 
     try {
       if (editFormData.id) {
-        // Check if email is taken by another user
-        const existingUser = await db.users
-          .where('email')
-          .equals(editFormData.email)
-          .first();
-
-        if (existingUser && existingUser.id !== editFormData.id) {
-          throw new Error('This email is already taken by another user');
-        }
-
-        // Update user
-        await db.users.update(editFormData.id, {
+        // Update existing user
+        await updateUser(editFormData.id, {
           email: editFormData.email,
           full_name: editFormData.full_name,
           password: editFormData.password,
           role: editFormData.role,
           department: editFormData.department,
-          updated_at: new Date().toISOString(),
         });
       } else {
-        // Check if email already exists
-        const existingUser = await db.users
-          .where('email')
-          .equals(editFormData.email)
-          .first();
-
-        if (existingUser) {
-          throw new Error('A user with this email already exists');
-        }
-
         // Create new user
-        await db.users.add({
-          id: crypto.randomUUID(),
+        await createUser({
           email: editFormData.email,
           full_name: editFormData.full_name,
           password: editFormData.password,
           role: editFormData.role,
           department: editFormData.department,
-          vacation_balance: 20,
-          sick_balance: 10,
-          personal_balance: 5,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         });
       }
 
@@ -110,11 +78,12 @@ export function UserManagement() {
         role: 'user',
         department: '',
       });
+      refresh(); // Refresh the users list
       alert(editFormData.id ? 'User updated successfully!' : 'User created successfully!');
     } catch (err: any) {
-      setError(err.message || 'Failed to save user');
+      setFormError(err.message || 'Failed to save user');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
@@ -134,23 +103,15 @@ export function UserManagement() {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      await db.transaction('rw', [db.users, db.timeEntries, db.leaveRequests], async () => {
-        // Delete user's time entries
-        await db.timeEntries.where('user_id').equals(userId).delete();
-        
-        // Delete user's leave requests
-        await db.leaveRequests.where('user_id').equals(userId).delete();
-        
-        // Delete user
-        await db.users.delete(userId);
-      });
+      await deleteUser(userId);
+      refresh(); // Refresh the users list after deletion
     } catch (err) {
       console.error('Error deleting user:', err);
       alert('Failed to delete user');
     }
   };
 
-  if (!users) {
+  if (loading) {
     return (
       <div className="flex h-32 items-center justify-center">
         <div className="text-center">
@@ -158,6 +119,17 @@ export function UserManagement() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Loading...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <div className="flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-400" />
+          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
         </div>
       </div>
     );
@@ -310,9 +282,9 @@ export function UserManagement() {
               </div>
             </div>
 
-            {error && (
+            {formError && (
               <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-                {error}
+                {formError}
               </div>
             )}
 
@@ -326,10 +298,10 @@ export function UserManagement() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={formLoading}
                 className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-primary-500 dark:hover:bg-primary-600"
               >
-                {loading ? (
+                {formLoading ? (
                   <>
                     <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     Saving...
@@ -364,7 +336,7 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
-              {users.map((u) => (
+              {users?.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center">
