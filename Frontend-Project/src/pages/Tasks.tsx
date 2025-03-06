@@ -4,8 +4,8 @@ import { TaskList } from '../components/projects/TaskList';
 import { TaskForm } from '../components/projects/TaskForm';
 import { useAuth } from '../components/AuthProvider';
 import { Task } from '../types';
-import { db } from '../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useTasks, useProjects } from '../lib/api';
+import { updateTask } from '../lib/api';
 
 export function Tasks() {
   const { user } = useAuth();
@@ -13,47 +13,17 @@ export function Tasks() {
   const [selectedProject, setSelectedProject] = useState('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  // Use live query for projects
-  const projects = useLiveQuery(
-    () => db.projects.toArray()
-  );
-
-  // Use live query for tasks with filtering
-  const tasks = useLiveQuery(
-    async () => {
-      if (!user) return [];
-
-      try {
-        let query = db.tasks;
-        
-        if (selectedProject) {
-          query = query.where('project_id').equals(selectedProject);
-        }
-
-        const tasks = await query.toArray();
-
-        // Filter based on user role
-        return tasks.filter(task => {
-          if (user.role === 'management') return true;
-          if (user.role === 'lead') return user.department === 'Engineering';
-          return task.assigned_to === user.id;
-        });
-      } catch (err) {
-        console.error('Error loading tasks:', err);
-        return [];
-      }
-    },
-    [user, selectedProject]
-  );
+  // Get tasks and projects from API
+  const { tasks, loading: tasksLoading, error: tasksError, refresh } = useTasks();
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
 
   const handleTaskUpdate = async (taskId: string, newStatus: Task['status']) => {
     try {
-      await db.tasks.update(taskId, {
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      });
+      await updateTask(taskId, { status: newStatus });
+      refresh(); // Refresh tasks list after update
     } catch (err) {
       console.error('Error updating task:', err);
+      alert('Failed to update task status');
     }
   };
 
@@ -66,9 +36,23 @@ export function Tasks() {
   const handleTaskSave = () => {
     setShowForm(false);
     setEditingTask(null);
+    refresh(); // Refresh tasks list after save
   };
 
-  if (!projects) {
+  // Filter tasks based on selected project and user role
+  const filteredTasks = tasks?.filter(task => {
+    // First filter by selected project if any
+    if (selectedProject && task.project_id !== selectedProject) {
+      return false;
+    }
+
+    // Then filter based on user role
+    if (user?.role === 'management') return true;
+    if (user?.role === 'lead') return user.department === 'Engineering';
+    return task.assigned_to === user?.id;
+  });
+
+  if (tasksLoading || projectsLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-center">
@@ -77,6 +61,16 @@ export function Tasks() {
             Loading...
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (tasksError || projectsError) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p className="text-sm text-red-700 dark:text-red-400">
+          {tasksError || projectsError}
+        </p>
       </div>
     );
   }
@@ -126,7 +120,7 @@ export function Tasks() {
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-dark-700 dark:bg-dark-800 dark:focus:border-primary-400"
           >
             <option value="">All Projects</option>
-            {projects.map(project => (
+            {projects?.map(project => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>
@@ -145,7 +139,7 @@ export function Tasks() {
       </div>
 
       <TaskList 
-        tasks={tasks || []}
+        tasks={filteredTasks || []}
         onTaskUpdate={handleTaskUpdate}
         onEdit={handleTaskEdit}
       />
