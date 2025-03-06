@@ -6,7 +6,6 @@ import { ProjectForm } from '../components/projects/ProjectForm';
 import { useAuth } from '../components/AuthProvider';
 import { Project } from '../types';
 import { db } from '../lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
 
 export function Projects() {
   const { user } = useAuth();
@@ -48,7 +47,7 @@ export function Projects() {
               .map(task => task.project_id)
           );
 
-          filteredProjects = allProjects.filter(project => 
+          filteredProjects = allProjects.filter(project =>
             userProjectIds.has(project.id)
           );
         } else if (user.role === 'lead') {
@@ -71,14 +70,14 @@ export function Projects() {
 
         // Apply status filter
         if (filter.status) {
-          filteredProjects = filteredProjects.filter(project => 
+          filteredProjects = filteredProjects.filter(project =>
             project.status === filter.status
           );
         }
 
         // Apply date filters
         if (filter.startDate) {
-          filteredProjects = filteredProjects.filter(project => 
+          filteredProjects = filteredProjects.filter(project =>
             project.start_date >= filter.startDate
           );
         }

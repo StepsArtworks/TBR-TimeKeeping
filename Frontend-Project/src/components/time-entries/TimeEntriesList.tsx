@@ -3,7 +3,8 @@ import { format } from 'date-fns';
 import { Clock, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import { TimeEntry } from '../../types';
 import { formatHours } from '../../lib/utils';
-import { useProjects, useTasks } from '../../lib/api';
+import { useTasks } from '../../lib/api';
+import { useProjects } from '../../hooks/useProjects';
 
 interface TimeEntriesListProps {
   entries: TimeEntry[];
@@ -21,7 +22,7 @@ export function TimeEntriesList({
   onEdit,
 }: TimeEntriesListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  
+
   // Get projects and tasks for entry details
   const { projects, loading: projectsLoading, error: projectsError } = useProjects();
   const { tasks, loading: tasksLoading, error: tasksError } = useTasks();

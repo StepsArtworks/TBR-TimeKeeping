@@ -2,7 +2,7 @@ import React from 'react';
 import { Calendar, Filter } from 'lucide-react';
 import { Project } from '../../types';
 import { cn } from '../../lib/utils';
-import { useProjects } from '../../lib/api';
+import { useProjects } from '../../hooks/useProjects';
 
 interface TimeEntriesFilterProps {
   startDate: string;

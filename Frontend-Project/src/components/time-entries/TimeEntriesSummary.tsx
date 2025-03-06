@@ -3,7 +3,7 @@ import { PieChart, Clock } from 'lucide-react';
 import { TimeEntry } from '../../types';
 import { formatHours, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../AuthProvider';
-import { useProjects } from '../../lib/api';
+import { useProjects } from '../../hooks/useProjects';
 
 interface TimeEntriesSummaryProps {
   entries: TimeEntry[];
@@ -20,7 +20,7 @@ export function TimeEntriesSummary({ entries }: TimeEntriesSummaryProps) {
   const projectSummary = relevantEntries.reduce((acc, entry) => {
     const project = projects?.find(p => p.id === entry.project_id);
     const projectName = project?.name || 'Unknown Project';
-    
+
     acc[projectName] = {
       total: (acc[projectName]?.total || 0) + entry.hours,
       billable: (acc[projectName]?.billable || 0) + (entry.is_billable ? entry.hours : 0),
