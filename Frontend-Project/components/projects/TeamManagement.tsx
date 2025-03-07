@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   User,
   Mail,
@@ -6,9 +6,9 @@ import {
   Calendar,
   MoreVertical,
   Plus,
-} from 'lucide-react';
-import { User as UserType } from '../../types';
-import { useUsers } from '../../lib/api';
+} from "lucide-react";
+import { User as UserType } from "../../src/types/index";
+import { useUsers } from "../../src/hooks/useUsers";
 
 interface TeamManagementProps {
   members: UserType[];
@@ -22,40 +22,40 @@ export function TeamManagement({
   onRemove,
 }: TeamManagementProps) {
   const [showAddMember, setShowAddMember] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Get all users from API
   const { users, loading: usersLoading, error: usersError } = useUsers();
 
   // Get available users (not already in team)
-  const availableUsers = users?.filter(
-    user => !members.find(member => member.id === user.id)
-  ) || [];
+  const availableUsers =
+    users?.filter((user) => !members.find((member) => member.id === user.id)) ||
+    [];
 
   const handleAddMember = async () => {
     if (!selectedUserId) return;
-    
+
     try {
       setLoading(true);
       await onAssign(selectedUserId);
       setShowAddMember(false);
-      setSelectedUserId('');
+      setSelectedUserId("");
     } catch (err) {
-      console.error('Error adding team member:', err);
+      console.error("Error adding team member:", err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRemoveMember = async (userId: string) => {
-    if (!confirm('Are you sure you want to remove this team member?')) return;
-    
+    if (!confirm("Are you sure you want to remove this team member?")) return;
+
     try {
       setLoading(true);
       await onRemove(userId);
     } catch (err) {
-      console.error('Error removing team member:', err);
+      console.error("Error removing team member:", err);
     } finally {
       setLoading(false);
     }
@@ -131,13 +131,13 @@ export function TeamManagement({
                     Adding...
                   </>
                 ) : (
-                  'Add Member'
+                  "Add Member"
                 )}
               </button>
               <button
                 onClick={() => {
                   setShowAddMember(false);
-                  setSelectedUserId('');
+                  setSelectedUserId("");
                 }}
                 className="rounded-lg px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-700"
               >
@@ -189,7 +189,7 @@ export function TeamManagement({
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <Calendar className="h-4 w-4" />
                 <span>
-                  Leave Balance: {member.vacation_balance}d vacation,{' '}
+                  Leave Balance: {member.vacation_balance}d vacation,{" "}
                   {member.sick_balance}d sick
                 </span>
               </div>
