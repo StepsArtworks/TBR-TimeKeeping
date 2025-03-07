@@ -30,6 +30,7 @@ app.use(
 app.use(bodyParser.json());
 
 require("./routes/auth.js")(app);
+require("./routes/users.js")(app);
 require("./routes/projects.js")(app);
 
 console.log(`TBR Timekeeping - Listening on Port ${port}`);
