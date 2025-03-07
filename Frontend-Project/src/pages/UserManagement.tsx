@@ -27,7 +27,7 @@ export function UserManagement() {
     role: 'user',
     department: '',
   });
-
+  console.log(users)
   // Only allow access to admin users
   if (user?.role !== 'admin') {
     return (
@@ -314,7 +314,7 @@ export function UserManagement() {
               </div>
             </div>
           ) : Array.isArray(users) && users.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+            < table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
               <thead>
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -390,6 +390,6 @@ export function UserManagement() {
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 }
