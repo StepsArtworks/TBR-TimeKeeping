@@ -182,17 +182,28 @@ export async function deleteTimeEntry(id: string): Promise<void> {
 
 // Users API
 export async function getUsers(): Promise<User[]> {
-  const response = await fetch(`${API_BASE_URL}/users`, {
-    headers: getAuthHeaders(),
-  });
-  return handleResponse<User[]>(response);
+  try {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<User[]>(response);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
 }
 
-export async function getUser(id: string): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/users/${id}`, {
-    headers: getAuthHeaders(),
-  });
-  return handleResponse<User>(response);
+export async function getUser(id: string): Promise<User | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    return await handleResponse<User>(response);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
 }
 
 export async function createUser(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
@@ -421,8 +432,6 @@ export function useTasks() {
 
   return { tasks, loading, error };
 }
-
-// Add this to the existing api.ts file, after the other API functions
 
 export async function resetPassword(email: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {

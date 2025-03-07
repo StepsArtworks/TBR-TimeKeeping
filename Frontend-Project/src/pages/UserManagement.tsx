@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Mail, Building, AlertCircle, Edit2, Trash2, Lock } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
-import { useUsers } from '../lib/api';
+import { useUsers } from '../hooks/useUsers';
 import { User } from '../types';
-import { createUser, updateUser, deleteUser } from '../lib/api';
 
 interface UserEditForm {
   id: string;
@@ -16,7 +15,7 @@ interface UserEditForm {
 
 export function UserManagement() {
   const { user } = useAuth();
-  const { users, loading, error, refresh } = useUsers();
+  const { users, loading, error, addUser, updateUser, removeUser, refresh } = useUsers();
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -60,12 +59,15 @@ export function UserManagement() {
         });
       } else {
         // Create new user
-        await createUser({
+        await addUser({
           email: editFormData.email,
           full_name: editFormData.full_name,
           password: editFormData.password,
           role: editFormData.role,
           department: editFormData.department,
+          vacation_balance: 0,
+          sick_balance: 0,
+          personal_balance: 0,
         });
       }
 
@@ -78,8 +80,7 @@ export function UserManagement() {
         role: 'user',
         department: '',
       });
-      refresh(); // Refresh the users list
-      alert(editFormData.id ? 'User updated successfully!' : 'User created successfully!');
+      await refresh();
     } catch (err: any) {
       setFormError(err.message || 'Failed to save user');
     } finally {
@@ -92,7 +93,7 @@ export function UserManagement() {
       id: u.id,
       email: u.email,
       full_name: u.full_name,
-      password: u.password,
+      password: '',
       role: u.role,
       department: u.department,
     });
@@ -103,8 +104,8 @@ export function UserManagement() {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      await deleteUser(userId);
-      refresh(); // Refresh the users list after deletion
+      await removeUser(userId);
+      await refresh();
     } catch (err) {
       console.error('Error deleting user:', err);
       alert('Failed to delete user');
@@ -220,7 +221,7 @@ export function UserManagement() {
                   <input
                     type="password"
                     id="password"
-                    required
+                    required={!editFormData.id} // Only required for new users
                     value={editFormData.password}
                     onChange={(e) =>
                       setEditFormData((prev) => ({ ...prev, password: e.target.value }))
@@ -336,7 +337,7 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
-              {users?.map((u) => (
+              {Array.isArray(users) && users.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center">
