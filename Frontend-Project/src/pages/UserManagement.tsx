@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Mail, Building, AlertCircle, Edit2, Trash2, Lock } from 'lucide-react';
+import { Plus, Mail, Building, AlertCircle, Edit2, Trash2, Lock, Loader } from 'lucide-react';
 import { useAuth } from '../components/AuthProvider';
 import { useUsers } from '../hooks/useUsers';
 import { User } from '../types';
@@ -111,30 +111,6 @@ export function UserManagement() {
       alert('Failed to delete user');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex h-32 items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Loading...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
-        <div className="flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 text-red-400" />
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -304,7 +280,7 @@ export function UserManagement() {
               >
                 {formLoading ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
                     Saving...
                   </>
                 ) : (
@@ -319,71 +295,99 @@ export function UserManagement() {
       <div>
         <h2 className="text-lg font-medium">Users</h2>
         <div className="mt-4 overflow-hidden rounded-lg bg-white shadow-sm dark:bg-dark-800">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-            <thead>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Department
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
-              {Array.isArray(users) && users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 dark:bg-primary-900/20">
-                        <div className="flex h-full w-full items-center justify-center text-sm font-medium text-primary-700 dark:text-primary-400">
-                          {u.full_name[0]}
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {u.full_name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {u.email}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span className="inline-flex rounded-full bg-primary-100 px-2 text-xs font-semibold leading-5 text-primary-800 dark:bg-primary-900/20 dark:text-primary-400">
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {u.department}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right">
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        onClick={() => handleEditUser(u)}
-                        className="text-sm text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(u.id)}
-                        className="text-sm text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          {loading ? (
+            <div className="flex h-32 items-center justify-center">
+              <div className="text-center">
+                <Loader className="mx-auto h-8 w-8 animate-spin text-primary-500" />
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Loading users...
+                </p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="p-4">
+              <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              </div>
+            </div>
+          ) : Array.isArray(users) && users.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Department
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 dark:bg-primary-900/20">
+                          <div className="flex h-full w-full items-center justify-center text-sm font-medium text-primary-700 dark:text-primary-400">
+                            {u.full_name[0]}
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {u.full_name}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {u.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="inline-flex rounded-full bg-primary-100 px-2 text-xs font-semibold leading-5 text-primary-800 dark:bg-primary-900/20 dark:text-primary-400">
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      {u.department}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                      <div className="flex justify-end space-x-3">
+                        <button
+                          onClick={() => handleEditUser(u)}
+                          className="text-sm text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u.id)}
+                          className="text-sm text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="flex h-32 items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  No users found
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
