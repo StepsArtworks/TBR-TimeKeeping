@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login as loginApi, logout as logoutApi, getCurrentUser } from '../lib/api';
+import { login as loginApi, logout as logoutApi } from '../lib/api';
 
 interface AuthContextType {
   user: any;
@@ -16,49 +16,78 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+function getCurrentUser() {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return null;
+    }
+
+    // Split the token into parts
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      // Invalid token format
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      return null;
+    }
+
+    // Decode the payload
+    const payload = JSON.parse(atob(parts[1]));
+
+    // Check if token is expired
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      // Token is expired
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      return null;
+    }
+
+    // Get user data from localStorage
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      return null;
+    }
+
+    return JSON.parse(userData);
+  } catch (error) {
+    console.error('Error parsing token:', error);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(() => getCurrentUser());
 
   useEffect(() => {
-    // Check if we have a token
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    // Verify token by making an API call to get current user
-    const verifyToken = async () => {
-      try {
-        const userData = await getCurrentUser();
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      } catch (error) {
-        console.error('Error verifying token:', error);
-        // Clear invalid token and user data
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        setUser(null);
-      } finally {
-        setLoading(false);
+    // Verify token on mount
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      setUser(null);
+      if (window.location.pathname !== '/login') {
+        navigate('/login');
       }
-    };
-
-    verifyToken();
-  }, []);
+    } else {
+      setUser(currentUser);
+    }
+    setLoading(false);
+  }, [navigate]);
 
   const handleLogin = async (email: string, password: string) => {
     try {
-      const { token, user } = await loginApi(email, password);
+      const response = await loginApi(email, password);
       
       // Store the JWT token
-      localStorage.setItem('authToken', token);
+      localStorage.setItem('authToken', response.token);
       
       // Store user data
-      setUser(user);
-      localStorage.setItem('user', JSON.stringify(user));
+      setUser(response.user);
+      localStorage.setItem('user', JSON.stringify(response.user));
       
       navigate('/', { replace: true });
     } catch (error) {
