@@ -27,7 +27,6 @@ export function UserManagement() {
     role: 'user',
     department: '',
   });
-  console.log(users)
   // Only allow access to admin users
   if (user?.role !== 'admin') {
     return (
