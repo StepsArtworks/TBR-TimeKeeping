@@ -18,11 +18,12 @@ export function useUsers() {
       setLoading(true);
       setError(null);
       const data = await getUsers();
-      setUsers(data);
+      // Ensure data is an array before setting it
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching users:', err);
       setError('Failed to load users');
-      setUsers([]);
+      setUsers([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
