@@ -1,5 +1,6 @@
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
+    const JWT_SECRET = 'dinosaur';
     console.log(req.headers);
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
